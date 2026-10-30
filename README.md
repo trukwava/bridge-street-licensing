@@ -62,6 +62,3 @@ Four domain tests passed. Live HTTP checks passed for seed counts (15 applicatio
 - [ ] Restore/import UI, automated backups and migration upgrades
 - [ ] Full mobile, accessibility and adversarial security review
 
-## Source note
-
-Original implementation inspired by the user-supplied [Pursuit Lookbook NY Business Licensing reference](https://lookbook.pursuit.org/projects/ny-business-licensing). The page could not be retrieved during this build. No code, branding, customer data, proprietary documents, performance figures or adoption claims were reused. See `docs/pilot.md` for the proposed pilot.
