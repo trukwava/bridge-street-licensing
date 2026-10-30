@@ -87,6 +87,35 @@ test('next-action brief links to the real deficiency without inventing a deadlin
  await expect(page.locator('#dialog h2')).toContainText('Review deficiency');
 });
 
+test('deficiency verification updates the queue and the same case next action',async ({page,request})=>{
+ await page.goto('/');
+ await page.locator('nav button[data-view="deficiencies"]').click();
+ const item=page.locator('.triage-case').filter({hasText:'SBP-2026-001'});
+ await item.locator('[data-open-def]').click();
+ await page.locator('#f-response').fill('Synthetic address document received');
+ await page.locator('#f-verification').selectOption('received');
+ await page.locator('#modalSave').click();
+ await expect(page.locator('.next-action-card')).toContainText('Verify response: Proof of business address');
+ await page.locator('[data-next-def]').click();
+ await page.locator('#f-verification').selectOption('verified');
+ await page.locator('#f-resolution').fill('Verified against the synthetic reference under staff review');
+ await page.locator('#modalSave').click();
+ await expect(page.locator('.next-action-card')).toContainText('Ready for coordinator review');
+ const snapshot=await (await request.get('/api')).json();
+ expect(snapshot.deficiencyInbox.some(d=>d.reference==='SBP-2026-001')).toBe(false);
+ expect(snapshot.deficiencyInbox.some(d=>d.reference==='SBP-2026-002')).toBe(true);
+});
+
+test('skip link and active navigation are keyboard discoverable',async ({page})=>{
+ await page.goto('/');
+ await page.keyboard.press('Tab');
+ await expect(page.locator('.skip-link')).toBeFocused();
+ await page.keyboard.press('Enter');
+ await expect(page.locator('#main')).toBeFocused();
+ await page.locator('nav button[data-view="deficiencies"]').click();
+ await expect(page.locator('nav button[data-view="deficiencies"]')).toHaveAttribute('aria-current','page');
+});
+
 test('case finder uses actual application identity and keyboard shortcut',async ({page})=>{
  await page.goto('/');
  await page.keyboard.press('Control+k');
