@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {draft,buckets,transition,validateTask,deficiencyInbox,portfolio} from './domain.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {draft,buckets,transition,validateTask,deficiencyInbox,portfolio,caseNextAction} from './domain.ts';
 test('blocked is not complete; reopen first',()=>{assert.throws(()=>transition('blocked','completed'));transition('blocked','in progress');transition('in progress','completed')});
 test('exactly one known owner or explicit unassigned',()=>{validateTask({title:'A',state:'open',owner:null});assert.throws(()=>validateTask({title:'A',state:'open',owner:['Alex','Morgan']}))});
 test('draft uses only source application unresolved items',()=>{const s=draft({business:'Harbor',reference:'A1',stage:'Intake',contact:'Reed',tasks:[{title:'Intake',state:'completed'}],deficiencies:[{description:'Proof of address',verification:'unverified'}]});assert.match(s,/Proof of address/);assert.doesNotMatch(s,/declaration/)});
@@ -32,4 +32,36 @@ test('portfolio counts unresolved work per stage without resurrecting withdrawn 
  assert.equal(p.length,5);
  assert.deepEqual(p.find(s=>s.stage==='Intake'),{stage:'Intake',count:1,openTasks:1,openDeficiencies:1,caseIds:['A']});
  assert.deepEqual(p.find(s=>s.stage==='Review'),{stage:'Review',count:1,openTasks:1,openDeficiencies:0,caseIds:['B']});
+});
+
+test('next action is source-linked, accounts for evidence and respects terminal records',()=>{
+ const a:any={
+  id:'one',status:'active',stage:'Intake',owner:'Alex',
+  tasks:[{id:'T1',title:'Intake',state:'completed',owner:'Alex',due:null}],
+  deficiencies:[{id:'D1',description:'Proof of business address',verification:'unverified',due:null}]
+ };
+ const initial=caseNextAction(a,'2026-10-30');
+ assert.equal(initial.kind,'deficiency');
+ assert.equal(initial.sourceId,'D1');
+ assert.match(initial.title,/Proof of business address/);
+ a.deficiencies[0].verification='received';
+ const received=caseNextAction(a,'2026-10-30');
+ assert.match(received.title,/Verify response/);
+ a.deficiencies[0].verification='verified';
+ assert.equal(caseNextAction(a,'2026-10-30').kind,'review');
+ a.status='withdrawn';
+ assert.equal(caseNextAction(a,'2026-10-30').kind,'inactive');
+});
+test('next action prioritizes unassigned and blocked tasks without pretending they are complete',()=>{
+ const a:any={status:'active',owner:'Morgan',tasks:[{id:'T1',title:'Step 1',state:'open',owner:null,due:null},
+  {id:'T2',title:'Step 2',state:'blocked',owner:'Jamie',due:null}],deficiencies:[]};
+ const first=caseNextAction(a,'2026-10-30');
+ assert.equal(first.sourceId,'T2');
+ assert.equal(first.kind,'task');
+ assert.match(first.title,/Unblock task/);
+ a.tasks[1].state='completed';
+ const second=caseNextAction(a,'2026-10-30');
+ assert.equal(second.sourceId,'T1');
+ assert.equal(second.owner,null);
+ assert.match(second.title,/Assign task/);
 });
