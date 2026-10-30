@@ -398,3 +398,18 @@ footer{border-top:1px solid #e4e4d9;margin-top:36px;color:#8a9389;font-size:10px
 .conflict-actions p{grid-column:1/-1;margin:0;color:#725337;font-size:12px}
 .conflict-actions button{white-space:normal}
 @media(max-width:450px){.conflict-actions:not([hidden]){grid-template-columns:1fr}}
+
+
+/* Versioned workflow and review ledger */
+.template-details{margin-top:23px;border:1px solid #d9e0d5;border-radius:9px;background:#f8f8f2;overflow:hidden}
+.template-details summary{cursor:pointer;color:#2d5746;padding:15px 18px;font:750 12px var(--at-sans);list-style-position:inside}
+.template-details summary:hover{background:#f0f3eb}
+.template-details[open] summary{border-bottom:1px solid #d9e0d5}
+.template-stage{padding:15px 21px;border-top:1px solid #e5e7df}
+.template-stage:first-of-type{border-top:0}
+.template-stage strong{color:#375545;font:800 10px var(--at-sans);letter-spacing:1px;text-transform:uppercase}
+.template-stage p{margin:8px 0 0;font-size:12px;color:#586c60}
+[data-draft-state]{display:block;margin:6px 0 12px;width:100%;max-width:none}
+[data-save-draft][disabled],#modalSave[disabled]{opacity:.64;cursor:wait}
+button:disabled{opacity:.48;cursor:not-allowed;filter:saturate(.6)}
+button:disabled:hover{transform:none;box-shadow:none}
