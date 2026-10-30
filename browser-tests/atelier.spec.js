@@ -165,7 +165,7 @@ test('workflow version editor creates a new template without rewriting old case 
  await page.locator('nav button[data-view="templates"]').click();
  await page.locator('#template').click();
  await expect(page.locator('#dialog h2')).toContainText('Publish workflow version 2');
- await page.locator('#tasks').fill('First required task\\nSecond required task');
+ await page.locator('#tasks').fill('First required task\nSecond required task');
  await page.locator('#stage0').fill('Approved synthetic onboarding message:');
  await page.locator('#modalSave').click();
  await expect(page.locator('#dialog')).not.toBeVisible();
