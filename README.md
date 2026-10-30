@@ -106,6 +106,7 @@ The browser suite intentionally resets its configured database before each test.
 - **Stale saves** show a recoverable 409 conflict, preserve the form fields, offer an explicit copy action and reload the latest server record. The application never retries a conflicting mutation automatically.
 - **Archived records** disable editing until reactivated. The API independently rejects writes to withdrawn/completed cases.
 - **Date-only deadlines** are validated as real calendar dates, with timezone-provenance preserved on state-only edits. Case references are normalized for uniqueness without depending on business/contact names.
+- Task cancellation requires an explicit explanatory note and audit history; it is not silently treated as completion. In the demo, cancelled items are excluded from the active checklist after staff has recorded that decision.
 - A **Skip to main content** link and visible keyboard focus facilitate navigation. The active desk view is exposed through `aria-current`.
 
 ### Verification and remaining constraints
@@ -113,3 +114,7 @@ The browser suite intentionally resets its configured database before each test.
 GitHub Actions runs a domain/HTTP integration suite and pinned Chromium acceptance on Ubuntu 24.04. The browser suite exercises case finding, evidence review, stage overrides, handoffs after reload, optimistic-concurrency recovery, portfolio CSV, stage-specific templates, inactive-case protection, and responsive layouts. It captures CI screenshots with short retention. Inspect the **latest commit's** GitHub Actions results before claiming the newest changes passed.
 
 The app remains a **single demo organization with fixed demo actor identity**, no real authentication, no organization administration, no authorized legal workflow, no live emailing or payment processing, and no production security certification. Do not expose it on a public network or enter actual client data. A separate product-security and accessibility assessment is required before any real pilot using identifiable records.
+
+### Adversarial checks
+
+CI injects HTML-like text into a synthetic case name and verifies that the portfolio and application workspace render it as inert text, never as markup. API integration tests reject oversized notes and evidence references, invalid dates, and unreasoned cancellations. These tests strengthen the demonstration but are **not** a substitute for application security testing with real authentication and tenant isolation.
