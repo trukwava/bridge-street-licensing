@@ -1,0 +1,41 @@
+name: Browser acceptance
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned browser test runner
+        run: npm install --no-save --no-audit --no-fund @playwright/test@1.56.1
+      - name: Install Chromium and operating-system libraries
+        run: npx playwright install --with-deps chromium
+      - name: Start disposable synthetic demo
+        shell: bash
+        run: |
+          echo "DB_PATH=$RUNNER_TEMP/bridge-street-browser.sqlite" >> "$GITHUB_ENV"
+          DB_PATH="$RUNNER_TEMP/bridge-street-browser.sqlite" node server.ts > "$RUNNER_TEMP/bridge-street-browser.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/bridge-street-browser.pid"
+          ready=0
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/api > /dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" != "1" ]; then cat "$RUNNER_TEMP/bridge-street-browser.log"; exit 1; fi
+      - name: Playwright functional and responsive checks
+        run: npx playwright test --config playwright.config.mjs
+      - name: Upload screenshot evidence and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atelier-browser-evidence
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
