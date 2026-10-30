@@ -3,6 +3,11 @@ const base='http://127.0.0.1:4173/api';const read=()=>fetch(base).then(r=>r.json
 await write('reset',{});let d=await read();
 assert.equal(d.portfolio.reduce((n:any,g:any)=>n+g.count,0),14,'Live portfolio excludes withdrawn records');
 assert.equal(d.deficiencyInbox.length,10,'Seeded unresolved deficiencies are present');
+assert.equal(d.nextActions['BS-001'].kind,'deficiency');
+assert.equal(d.nextActions['BS-001'].sourceId,'BS-001-D1');
+assert.match(d.nextActions['BS-001'].title,/Proof of business address/);
+assert.equal(d.nextActions['BS-015'].kind,'inactive');
+
 assert.equal(d.deficiencyInbox.every((x:any)=>x.reference&&x.appId&&x.verification!=='verified'),true,'Every inbox row has stable application identity');
 assert.equal(d.portfolio.some((g:any)=>g.stage==='Intake'),true);
 const css=await fetch('http://127.0.0.1:4173/atelier.css');assert.equal(css.status,200,'Atelier CSS must be served');
