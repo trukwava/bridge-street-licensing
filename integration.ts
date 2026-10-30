@@ -23,6 +23,10 @@ let updatedDue=await write('task',{id:dueCase.id,revision:dueCase.revision,taskI
 assert.equal(updatedDue.tasks[0].provenance,originalProvenance,'Owner/state-only edits must not invent deadline provenance');
 await write('task',{id:updatedDue.id,revision:updatedDue.revision,taskId:dueTask.id,state:dueTask.state,owner:dueTask.owner,due:'2026-02-30'},400);
 
+const bounds=d.apps.find((item:any)=>item.id==='BS-001');
+await write('handoff',{id:bounds.id,revision:bounds.revision,owner:'Morgan',note:'x'.repeat(2001)},400);
+await write('deficiency',{id:bounds.id,revision:bounds.revision,description:'Bounded test',evidence:'x'.repeat(1001)},400);
+await write('reference',{id:bounds.id,revision:bounds.revision,kind:'documents',label:'Bounded test',reference:'x'.repeat(1001)},400);
 let a=d.apps.find((a:any)=>a.id==='BS-001');await write('stage',{id:a.id,revision:a.revision},400);a=await write('draft',{id:a.id,revision:a.revision});assert.match(a.drafts[0].body,/Proof of business address/);assert.doesNotMatch(a.drafts[0].body,/Signed applicant declaration/);
 assert.match(a.drafts[0].body,/internal intake checklist/i);
 const draftId=a.drafts[0].id;
