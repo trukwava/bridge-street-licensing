@@ -16,6 +16,13 @@ const html=await fetch('http://127.0.0.1:4173/');assert.equal(html.status,200);
 const markup=await html.text();assert.match(markup,/data-view="portfolio"/);assert.match(markup,/data-view="deficiencies"/);assert.match(markup,/id="caseFinder"/);assert.match(markup,/id="quickFind"/);
 const appJS=await fetch('http://127.0.0.1:4173/app.js');assert.equal(appJS.status,200);
 const appSource=await appJS.text();assert.match(appSource,/function deficienciesScreen/);assert.match(appSource,/function showFinder/);assert.equal(d.apps.length,15);assert.equal(d.apps.flatMap((a:any)=>a.tasks).length,40);assert.equal(d.apps.flatMap((a:any)=>a.deficiencies).length,10);assert.equal(d.today.filter((t:any)=>t.flags.includes('Overdue')).length,3);assert.equal(d.today.filter((t:any)=>t.flags.includes('Unassigned')).length,2);
+const invalidToday=await fetch(base+'?today=2026-02-30');assert.equal(invalidToday.status,400);
+let dueCase=d.apps.find((a:any)=>a.id==='BS-002'),dueTask=dueCase.tasks[0];
+const originalProvenance=dueTask.provenance;
+let updatedDue=await write('task',{id:dueCase.id,revision:dueCase.revision,taskId:dueTask.id,state:dueTask.state,owner:dueTask.owner,due:dueTask.due});
+assert.equal(updatedDue.tasks[0].provenance,originalProvenance,'Owner/state-only edits must not invent deadline provenance');
+await write('task',{id:updatedDue.id,revision:updatedDue.revision,taskId:dueTask.id,state:dueTask.state,owner:dueTask.owner,due:'2026-02-30'},400);
+
 let a=d.apps.find((a:any)=>a.id==='BS-001');await write('stage',{id:a.id,revision:a.revision},400);a=await write('draft',{id:a.id,revision:a.revision});assert.match(a.drafts[0].body,/Proof of business address/);assert.doesNotMatch(a.drafts[0].body,/Signed applicant declaration/);
 assert.match(a.drafts[0].body,/internal intake checklist/i);
 const draftId=a.drafts[0].id;
