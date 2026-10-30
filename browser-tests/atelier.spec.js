@@ -230,6 +230,24 @@ test('archived cases are read-only until deliberately reactivated',async ({page}
  await expect(page.locator('[data-edit-task]').first()).toBeEnabled();
 });
 
+test('untrusted case names are rendered inert and never execute HTML',async ({page,request})=>{
+ const malicious='<img src=x onerror="window.__untrustedExecuted=true">';
+ const resp=await request.post('/api/create',{data:{
+  client:'Synthetic adversarial fixture',business:malicious,reference:'SAFETY-HTML-001',
+  jurisdiction:'Fictional',owner:'Alex',priority:'Normal'
+ }});
+ expect(resp.status()).toBe(200);
+ await page.goto('/');
+ await page.locator('nav button[data-view="portfolio"]').click();
+ const tile=page.locator('.portfolio-case').filter({hasText:'SAFETY-HTML-001'});
+ await expect(tile).toContainText(malicious);
+ await expect(tile.locator('img')).toHaveCount(0);
+ expect(await page.evaluate(()=>window.__untrustedExecuted)).toBeUndefined();
+ await tile.click();
+ await expect(page.locator('.case-hero')).toContainText(malicious);
+ expect(await page.evaluate(()=>window.__untrustedExecuted)).toBeUndefined();
+});
+ 
 test('mobile desk is navigable and captures a screenshot',async ({page})=>{
  await page.setViewportSize({width:390,height:844});
  await page.goto('/');
