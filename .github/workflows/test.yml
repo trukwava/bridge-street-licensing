@@ -17,6 +17,8 @@ jobs:
         with:
           node-version: '24'
       - run: npm test
+      - name: Verify offline backup and restore safeguards
+        run: node backup-test.ts
       - name: Integration checks against isolated synthetic database
         shell: bash
         run: |
