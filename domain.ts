@@ -86,3 +86,13 @@ export function caseNextAction(a: any, today: string) {
  return {kind:'review',sourceId:null,title:'Ready for coordinator review',owner:a.owner||null,due:null,
   explanation:'No outstanding task or unverified deficiency is recorded. Stage advancement still requires staff review.'};
 }
+
+
+/** True only for a real YYYY-MM-DD calendar date; does not convert dates to instants. */
+export function isDateOnly(value: unknown): boolean {
+ if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+ const [y,m,d]=value.split('-').map(Number);
+ if (y < 1900 || y > 9999 || m < 1 || m > 12 || d < 1) return false;
+ const candidate=new Date(Date.UTC(y,m-1,d));
+ return candidate.getUTCFullYear()===y && candidate.getUTCMonth()===m-1 && candidate.getUTCDate()===d;
+}
