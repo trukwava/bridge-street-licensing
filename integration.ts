@@ -1,9 +1,19 @@
 import assert from 'node:assert/strict';
 const base='http://127.0.0.1:4173/api';const read=()=>fetch(base).then(r=>r.json());async function write(p:string,b:any,code=200){const r=await fetch(base+'/'+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});assert.equal(r.status,code);return r.json()}
-await write('reset',{});let d=await read();assert.equal(d.apps.length,15);assert.equal(d.apps.flatMap((a:any)=>a.tasks).length,40);assert.equal(d.apps.flatMap((a:any)=>a.deficiencies).length,10);assert.equal(d.today.filter((t:any)=>t.flags.includes('Overdue')).length,3);assert.equal(d.today.filter((t:any)=>t.flags.includes('Unassigned')).length,2);
+await write('reset',{});let d=await read();
+assert.equal(d.portfolio.reduce((n:any,g:any)=>n+g.count,0),14,'Live portfolio excludes withdrawn records');
+assert.equal(d.deficiencyInbox.length,10,'Seeded unresolved deficiencies are present');
+assert.equal(d.deficiencyInbox.every((x:any)=>x.reference&&x.appId&&x.verification!=='verified'),true,'Every inbox row has stable application identity');
+assert.equal(d.portfolio.some((g:any)=>g.stage==='Intake'),true);
+const css=await fetch('http://127.0.0.1:4173/atelier.css');assert.equal(css.status,200,'Atelier CSS must be served');
+assert.match(await css.text(),/ATELIER/);
+const html=await fetch('http://127.0.0.1:4173/');assert.equal(html.status,200);
+const markup=await html.text();assert.match(markup,/data-view="portfolio"/);assert.match(markup,/data-view="deficiencies"/);
+const appJS=await fetch('http://127.0.0.1:4173/app.js');assert.equal(appJS.status,200);
+assert.match(await appJS.text(),/function deficienciesScreen/);assert.equal(d.apps.length,15);assert.equal(d.apps.flatMap((a:any)=>a.tasks).length,40);assert.equal(d.apps.flatMap((a:any)=>a.deficiencies).length,10);assert.equal(d.today.filter((t:any)=>t.flags.includes('Overdue')).length,3);assert.equal(d.today.filter((t:any)=>t.flags.includes('Unassigned')).length,2);
 let a=d.apps.find((a:any)=>a.id==='BS-001');await write('stage',{id:a.id,revision:a.revision},400);a=await write('draft',{id:a.id,revision:a.revision});assert.match(a.drafts[0].body,/Proof of business address/);assert.doesNotMatch(a.drafts[0].body,/Signed applicant declaration/);a=await write('stage',{id:a.id,revision:a.revision,reason:'Demo supervisor: continue preparation while address is collected'});assert.equal(a.stage,'Preparation');assert.equal(a.deficiencies[0].verification,'unverified');assert.match(a.activity[0].action,/override/);
 a=(await read()).apps.find((a:any)=>a.id==='BS-005');const t=a.tasks.find((t:any)=>t.owner==='Alex');const old=a.revision;a=await write('task',{id:a.id,revision:old,taskId:t.id,state:t.state,owner:'Morgan',due:'2026-10-20',note:'Morgan will review the supporting file'});await write('task',{id:a.id,revision:old,taskId:t.id,state:'completed',owner:'Morgan'},409);d=await read();assert.equal(d.today.find((x:any)=>x.id===t.id).owner,'Morgan');assert.match(a.activity[0].action,/Alex → Morgan/);
 const snapshot=JSON.stringify(a.templateSnapshot);await write('template',{tasks:'New intake task\nReview revised documents'});a=(await read()).apps.find((x:any)=>x.id===a.id);assert.equal(JSON.stringify(a.templateSnapshot),snapshot);
 await write('reference',{id:'foreign',revision:1,kind:'documents',label:'test',reference:'x'},400);
 await write('create',{client:'Test',business:'Test shop',reference:'TEST-001',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'});await write('create',{client:'Test',business:'Duplicate',reference:'TEST-001',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'},400);
-await write('reset',{});console.log('PASS: seed counts, draft identity, stage blocker/override, persisted handoff, stale-edit conflict, immutable template, record scope, create validation. Demo restored.');
+await write('reset',{});console.log('PASS: seed counts, draft identity, stage blocker/override, persisted handoff, stale-edit conflict, immutable template, record scope, create validation. Atelier assets and portfolio/deficiency models verified. Demo restored.');
