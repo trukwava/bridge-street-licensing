@@ -102,6 +102,30 @@ test('task reassignment survives reload and leaves the prior owner in history',a
  await expect(page.locator('.panel').filter({hasText:'Accountable tasks'}).first()).toContainText('Morgan');
 });
 
+test('stale edits never overwrite newer work and offer an explicit recovery path',async ({page,request})=>{
+ await page.goto('/');
+ await page.locator('#quickFind').click();
+ await page.locator('#finderSearch').fill('SBP-2026-005');
+ await page.locator('.finder-result').click();
+ await page.locator('[data-edit-task]').first().click();
+ await page.locator('#f-owner').selectOption('Morgan');
+ await page.locator('#f-note').fill('Unsaved handoff note to preserve');
+ const snapshot=await (await request.get('/api')).json();
+ const app=snapshot.apps.find(a=>a.id==='BS-005');
+ const updated=await request.post('/api/reference',{data:{id:app.id,revision:app.revision,kind:'documents',label:'Concurrent addition',reference:'SYN-NEW'}});
+ expect(updated.status()).toBe(200);
+ await page.locator('#modalSave').click();
+ await expect(page.locator('#dialog')).toBeVisible();
+ await expect(page.locator('#formerror')).toContainText('Stale record');
+ await expect(page.locator('#f-note')).toHaveValue('Unsaved handoff note to preserve');
+ await expect(page.locator('#conflictActions')).toBeVisible();
+ const latest=await (await request.get('/api')).json();
+ expect(latest.apps.find(a=>a.id==='BS-005').tasks[0].owner).toBe('Alex');
+ await page.locator('#reloadLatest').click();
+ await expect(page.locator('#dialog')).not.toBeVisible();
+ await expect(page.locator('#notice')).toContainText('Latest saved record loaded');
+});
+
 test('mobile desk is navigable and captures a screenshot',async ({page})=>{
  await page.setViewportSize({width:390,height:844});
  await page.goto('/');
