@@ -436,3 +436,13 @@ button:disabled:hover{transform:none;box-shadow:none}
  box-shadow:0 6px 30px #09271e55;transition:top .15s}
 .skip-link:focus{top:12px;outline:3px solid #a56f2a;outline-offset:2px}
 main:focus{outline:none}
+
+
+/* Case custody register — an evidence-led editorial timeline */
+.handoff-entry{position:relative;margin:13px 0 0;padding:16px 17px 17px;border:1px solid #e3e2d5;border-radius:8px;
+ background:linear-gradient(140deg,#fffefa,#f5f4ec)}
+.handoff-entry:before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:#c5a172;border-radius:8px 0 0 8px}
+.handoff-transfer{display:flex;align-items:center;gap:11px;color:#8d714b}
+.handoff-transfer strong{font:500 18px var(--at-serif);color:#27523d}
+.handoff-entry p{margin:10px 0 7px;color:#566c5b;font-size:12px}
+.handoff-entry small{font-size:10px;color:#8b978b}
