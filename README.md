@@ -94,3 +94,22 @@ npx playwright test --config playwright.config.mjs
 The browser suite intentionally resets its configured database before each test. It must **never** be pointed at a database containing edits you want to preserve. CI runs in a fresh environment to avoid this risk.
 
 **Unverified:** Visual browser tests, keyboard and viewport findings should be treated as pending until the `Browser acceptance` GitHub workflow completes successfully and artifacts are reviewed. Automated passing checks would not establish production security or accessibility conformance.
+
+## Fourth movement: pilot-operable review, recovery and export
+
+- The case-file **Next Accountable Action** is sourced from the application's own task/deficiency IDs, with a direct edit/review action; it never signifies statutory eligibility or approval.
+- The **Chain of Custody** ledger presents structured task/application owner transfers, their notes and original UTC instants (displayed in the office's New York timezone). The original previous owner is never discarded.
+- The **Portfolio** exports a CSV of active cases and unresolved work. It excludes withdrawn/completed records and prefixes spreadsheet-dangerous cell values before quoting them; no external spreadsheet integration is connected.
+- **Stage advancement** lists the exact unresolved requirements before an override. The reason is persisted; deficiencies remain visible afterward.
+- **Follow-up drafts** use each application's versioned stage-specific wording and current outstanding items. Staff can edit, choose a recipient, mark draft/accepted/rejected, copy locally or export text. Nothing is sent. Acceptance requires a valid recipient and nonempty draft.
+- **Workflow library** can publish new immutable versions, including up to 30 task titles and stage-specific follow-up wording. An in-flight application retains its original snapshot. Explicit demo reset also restores the initial template version.
+- **Stale saves** show a recoverable 409 conflict, preserve the form fields, offer an explicit copy action and reload the latest server record. The application never retries a conflicting mutation automatically.
+- **Archived records** disable editing until reactivated. The API independently rejects writes to withdrawn/completed cases.
+- **Date-only deadlines** are validated as real calendar dates, with timezone-provenance preserved on state-only edits. Case references are normalized for uniqueness without depending on business/contact names.
+- A **Skip to main content** link and visible keyboard focus facilitate navigation. The active desk view is exposed through `aria-current`.
+
+### Verification and remaining constraints
+
+GitHub Actions runs a domain/HTTP integration suite and pinned Chromium acceptance on Ubuntu 24.04. The browser suite exercises case finding, evidence review, stage overrides, handoffs after reload, optimistic-concurrency recovery, portfolio CSV, stage-specific templates, inactive-case protection, and responsive layouts. It captures CI screenshots with short retention. Inspect the **latest commit's** GitHub Actions results before claiming the newest changes passed.
+
+The app remains a **single demo organization with fixed demo actor identity**, no real authentication, no organization administration, no authorized legal workflow, no live emailing or payment processing, and no production security certification. Do not expose it on a public network or enter actual client data. A separate product-security and accessibility assessment is required before any real pilot using identifiable records.
