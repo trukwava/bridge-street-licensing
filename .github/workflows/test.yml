@@ -1,5 +1,11 @@
 name: Domain checks
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -11,3 +17,19 @@ jobs:
         with:
           node-version: '24'
       - run: npm test
+      - name: Verify offline backup and restore safeguards
+        run: node backup-test.ts
+      - name: Integration checks against isolated synthetic database
+        shell: bash
+        run: |
+          export DB_PATH="$RUNNER_TEMP/bridge-street-integration.sqlite"
+          node server.ts > "$RUNNER_TEMP/bridge-street-server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:4173/api > /dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" != "1" ]; then cat "$RUNNER_TEMP/bridge-street-server.log"; exit 1; fi
+          node integration.ts

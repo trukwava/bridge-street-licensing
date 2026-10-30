@@ -1,1 +1,15 @@
-{"name":"bridge-street-licensing","private":true,"type":"module","scripts":{"start":"node server.ts","test":"node --test test.ts"},"engines":{"node":">=24"}}
+{
+  "name": "bridge-street-licensing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.ts",
+    "test": "node --check public/app.js && node --test test.ts",
+    "backup:export": "node backup.ts export",
+    "backup:verify": "node backup.ts verify",
+    "backup:restore": "node backup.ts restore"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
