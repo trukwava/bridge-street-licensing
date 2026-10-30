@@ -19,6 +19,17 @@ const appSource=await appJS.text();assert.match(appSource,/function deficiencies
 let a=d.apps.find((a:any)=>a.id==='BS-001');await write('stage',{id:a.id,revision:a.revision},400);a=await write('draft',{id:a.id,revision:a.revision});assert.match(a.drafts[0].body,/Proof of business address/);assert.doesNotMatch(a.drafts[0].body,/Signed applicant declaration/);a=await write('stage',{id:a.id,revision:a.revision,reason:'Demo supervisor: continue preparation while address is collected'});assert.equal(a.stage,'Preparation');assert.equal(a.deficiencies[0].verification,'unverified');assert.match(a.activity[0].action,/override/);
 a=(await read()).apps.find((a:any)=>a.id==='BS-005');const t=a.tasks.find((t:any)=>t.owner==='Alex');const old=a.revision;a=await write('task',{id:a.id,revision:old,taskId:t.id,state:t.state,owner:'Morgan',due:'2026-10-20',note:'Morgan will review the supporting file'});await write('task',{id:a.id,revision:old,taskId:t.id,state:'completed',owner:'Morgan'},409);d=await read();assert.equal(d.today.find((x:any)=>x.id===t.id).owner,'Morgan');assert.match(a.activity[0].action,/Alex → Morgan/);
 const snapshot=JSON.stringify(a.templateSnapshot);await write('template',{tasks:'New intake task\nReview revised documents'});a=(await read()).apps.find((x:any)=>x.id===a.id);assert.equal(JSON.stringify(a.templateSnapshot),snapshot);
+const templateVersions=(await read()).templates.map((t:any)=>t.version);
+assert.ok(templateVersions.length>1,'Versioning must create a second version');
+
 await write('reference',{id:'foreign',revision:1,kind:'documents',label:'test',reference:'x'},400);
 await write('create',{client:'Test',business:'Test shop',reference:'TEST-001',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'});await write('create',{client:'Test',business:'Duplicate',reference:'TEST-001',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'},400);
-await write('reset',{});console.log('PASS: seed counts, draft identity, stage blocker/override, persisted handoff, stale-edit conflict, immutable template, record scope, create validation. Atelier assets and portfolio/deficiency models verified. Demo restored.');
+const withdrawn=(await read()).apps.find((x:any)=>x.id==='BS-015');
+await write('draft',{id:withdrawn.id,revision:withdrawn.revision},400);
+await write('task',{id:withdrawn.id,revision:withdrawn.revision,taskId:withdrawn.tasks[0].id,state:'completed',owner:withdrawn.tasks[0].owner},400);
+await write('stage',{id:withdrawn.id,revision:withdrawn.revision,reason:'Not authorized when withdrawn'},400);
+await write('reset',{});
+d=await read();
+assert.deepEqual(d.templates.map((t:any)=>t.version),[1],'Reset must restore template library to version 1');
+assert.equal(d.apps.length,15);
+console.log('PASS: seed counts, draft identity, stage blocker/override, persisted handoff, stale-edit conflict, immutable template, record scope, create validation. Atelier assets and portfolio/deficiency models verified. Demo restored.');
