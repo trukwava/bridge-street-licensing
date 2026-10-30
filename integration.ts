@@ -18,7 +18,14 @@ const appJS=await fetch('http://127.0.0.1:4173/app.js');assert.equal(appJS.statu
 const appSource=await appJS.text();assert.match(appSource,/function deficienciesScreen/);assert.match(appSource,/function showFinder/);assert.equal(d.apps.length,15);assert.equal(d.apps.flatMap((a:any)=>a.tasks).length,40);assert.equal(d.apps.flatMap((a:any)=>a.deficiencies).length,10);assert.equal(d.today.filter((t:any)=>t.flags.includes('Overdue')).length,3);assert.equal(d.today.filter((t:any)=>t.flags.includes('Unassigned')).length,2);
 let a=d.apps.find((a:any)=>a.id==='BS-001');await write('stage',{id:a.id,revision:a.revision},400);a=await write('draft',{id:a.id,revision:a.revision});assert.match(a.drafts[0].body,/Proof of business address/);assert.doesNotMatch(a.drafts[0].body,/Signed applicant declaration/);a=await write('stage',{id:a.id,revision:a.revision,reason:'Demo supervisor: continue preparation while address is collected'});assert.equal(a.stage,'Preparation');assert.equal(a.deficiencies[0].verification,'unverified');assert.match(a.activity[0].action,/override/);
 a=(await read()).apps.find((a:any)=>a.id==='BS-005');const t=a.tasks.find((t:any)=>t.owner==='Alex');const old=a.revision;a=await write('task',{id:a.id,revision:old,taskId:t.id,state:t.state,owner:'Morgan',due:'2026-10-20',note:'Morgan will review the supporting file'});await write('task',{id:a.id,revision:old,taskId:t.id,state:'completed',owner:'Morgan'},409);d=await read();assert.equal(d.today.find((x:any)=>x.id===t.id).owner,'Morgan');assert.match(a.activity[0].action,/Alex → Morgan/);
-const snapshot=JSON.stringify(a.templateSnapshot);await write('template',{tasks:'New intake task\nReview revised documents'});a=(await read()).apps.find((x:any)=>x.id===a.id);assert.equal(JSON.stringify(a.templateSnapshot),snapshot);
+const snapshot=JSON.stringify(a.templateSnapshot);await write('template',{tasks:'New intake task\nReview revised documents',followupIntros:{Intake:'Custom approved intake wording for the synthetic demo:'}});a=(await read()).apps.find((x:any)=>x.id===a.id);assert.equal(JSON.stringify(a.templateSnapshot),snapshot);
+const created=await write('create',{client:'New client',business:'New case after versioning',reference:'NEW-2026-A',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'});
+assert.equal(created.templateVersion,2);
+assert.equal(created.templateSnapshot.followupIntros.Intake,'Custom approved intake wording for the synthetic demo:');
+const newDraft=await write('draft',{id:created.id,revision:created.revision});
+assert.match(newDraft.drafts[0].body,/Custom approved intake wording/);
+assert.equal(a.templateVersion,1);
+
 const templateVersions=(await read()).templates.map((t:any)=>t.version);
 assert.ok(templateVersions.length>1,'Versioning must create a second version');
 
