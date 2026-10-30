@@ -70,3 +70,26 @@ function deficienciesScreen(){
  <div class="triage-list" aria-live="polite">${rows.map(d=>`<article class="triage-case"><div class="triage-case-main"><span class="detail-kicker">${esc(d.reference)} · ${esc(d.business)}</span><h3>${esc(d.description)}</h3><p class="triage-evidence">Evidence reference: ${esc(d.evidence||'Not recorded')}</p><div class="triage-details"><span>Owner: ${esc(d.owner||'Unassigned')}</span><span>Requested: ${esc(d.requested||'Not recorded')}</span><span>Due: ${esc(d.due||'Not provided')}</span></div></div><div class="triage-case-action"><span class="tag ${d.overdue?'overdue':d.verification==='received'?'awaiting-response':'blocked'}">${d.overdue?'Overdue':d.verification==='received'?'Response received':'Awaiting evidence'}</span><span class="triage-next">${esc(d.nextAction)}</span><button class="primary" type="button" data-open-def="${esc(d.id)}" data-app="${esc(d.appId)}">Review in case file →</button></div></article>`).join('')||'<div class="empty">No unresolved deficiencies match this filter. Try All unresolved or clear your search.</div>'}</div></div>
  <p class="portfolio-footnote">A received response is not verified evidence. Only an explicit verification with a resolution note clears a deficiency.</p>`;
 }
+function populateFinder(){
+ const list=$('#finderResults');
+ if(!data){list.textContent='Loading case records…';return;}
+ const q=$('#finderSearch').value.trim().toLocaleLowerCase();
+ const results=data.apps.filter(a=>[a.business,a.reference,a.contact,a.client,a.owner].some(value=>String(value||'').toLocaleLowerCase().includes(q))).slice(0,12);
+ list.innerHTML=results.length?results.map(a=>`<button class="finder-result" type="button" data-finder-id="${esc(a.id)}"><span class="finder-result-ref">${esc(a.reference)} · ${esc(a.status)}</span><strong>${esc(a.business)}</strong><span>${esc(a.stage)} · Accountable: ${esc(a.owner||'Unassigned')}</span></button>`).join(''):'<p class="finder-empty">No case matched. Try a reference number or a different business name.</p>';
+ list.querySelectorAll('[data-finder-id]').forEach(b=>b.onclick=()=>{
+  selected=b.dataset.finderId;view='workspace';$('#caseFinder').close();render();
+ });
+}
+function showFinder(){
+ if(!data){$('#notice').textContent='Case records are still loading. Please try again.';return;}
+ const d=$('#caseFinder');if(d.open)return;
+ $('#finderSearch').value='';
+ populateFinder();
+ d.showModal();
+ $('#finderSearch').focus();
+}
+$('#quickFind').onclick=showFinder;
+$('#finderClose').onclick=()=>$('#caseFinder').close();
+$('#finderSearch').addEventListener('input',populateFinder);
+$('#finderSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){const first=$('#finderResults [data-finder-id]');if(first){e.preventDefault();first.click()}}});
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();showFinder()}});
