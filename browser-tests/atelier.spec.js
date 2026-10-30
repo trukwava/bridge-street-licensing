@@ -141,6 +141,9 @@ test('task reassignment survives reload and leaves the prior owner in history',a
  await page.getByRole('button',{name:'Save',exact:true}).click();
  await expect(page.locator('#dialog')).not.toBeVisible();
  await expect(page.locator('.timeline')).toContainText('Alex → Morgan');
+ await expect(page.locator('.handoff-entry').first()).toContainText('Alex');
+ await expect(page.locator('.handoff-entry').first()).toContainText('Morgan');
+ await expect(page.locator('.handoff-entry').first()).toContainText('Morgan takes the supporting-document review.');
  await page.reload();
  await page.locator('#quickFind').click();
  await page.locator('#finderSearch').fill('SBP-2026-005');
