@@ -42,7 +42,7 @@ All imported-looking references are inert escaped text. There are no connectors,
 
 ## Verification performed
 
-Four domain tests passed. Live HTTP checks passed for seed counts (15 applications, 40 tasks, 10 deficiencies, 3 overdue tasks, 2 unassigned tasks), correct-record drafting, stage blocker/override, handoff reload persistence, stale-edit rejection (409), immutable template snapshots, unknown-record rejection, and create/reference uniqueness validation. Desktop browser verification confirmed Today, application workspace, and generation of the correct address request. Mobile CSS is implemented but device-level testing remains pending.
+The initial domain and HTTP checks passed; consult the current GitHub Actions runs for the latest revision. Live HTTP checks passed for seed counts (15 applications, 40 tasks, 10 deficiencies, 3 overdue tasks, 2 unassigned tasks), correct-record drafting, stage blocker/override, handoff reload persistence, stale-edit rejection (409), immutable template snapshots, unknown-record rejection, and create/reference uniqueness validation. Desktop browser verification confirmed Today, application workspace, and generation of the correct address request. Mobile CSS is implemented but device-level testing remains pending.
 
 ## Implementation status
 
@@ -58,7 +58,7 @@ Four domain tests passed. Live HTTP checks passed for seed counts (15 applicatio
 - [ ] Production authentication, staff roles and tenant isolation
 - [ ] Client-approved configurable stage rules and calendars
 - [ ] Editing stage-specific template wording in the interface
-- [ ] Dedicated deficiency queue and full application search
+- [x] Dedicated deficiency queue and keyboard-accessible application search
 - [ ] Restore/import UI, automated backups and migration upgrades
 - [ ] Full mobile, accessibility and adversarial security review
 
@@ -71,3 +71,26 @@ The **Evidence desk** lists unresolved deficiencies, separates unverified work f
 The **Today** exception alert is now calculated from the unresolved register instead of a hardcoded example.
 
 Run `npm test` to execute domain and browser-script syntax checks. GitHub Actions also starts an isolated synthetic SQLite instance, exercises the API and confirms the stylesheet and both navigation routes can be served. These checks do **not** replace visual accessibility, keyboard, tablet or device-level QA. The demo remains local-only and is not suitable for real client records.
+
+## Third movement: actionable case brief and browser acceptance
+
+Every active case has exactly one **Next Accountable Action** brief selected deterministically from its own unresolved items. It prioritizes received-but-unverified evidence, overdue evidence, blocked work, unassigned tasks and remaining incomplete work. The brief shows the source owner and user-entered due date without inventing statutory deadlines, and routes directly to the source task or deficiency. A completed/withdrawn case produces no active recommendation. This is coordination assistance, not an eligibility or approval decision.
+
+The **Portfolio** case tiles surface the same next action so coordinators can triage without opening every record. The case finder (⌘K / Ctrl+K) searches the source records by business, contact, reference, client and owner.
+
+A dedicated `Browser acceptance` workflow uses pinned Playwright + Chromium against a disposable synthetic SQLite file and exercises the Today dashboard, portfolio board, evidence-review route, case finder, and handoff persistence. It uploads screenshot evidence and traces with limited retention. The UI uses no external fonts or images.
+
+**Reproduce browser acceptance locally (not required for ordinary app use):**
+
+```sh
+npm install --no-save --no-audit --no-fund @playwright/test@1.56.1
+npx playwright install chromium
+# IMPORTANT: use a disposable database file, and do not use an existing demo database.
+DB_PATH=/tmp/bridge-street-browser.sqlite npm start
+# In another terminal:
+npx playwright test --config playwright.config.mjs
+```
+
+The browser suite intentionally resets its configured database before each test. It must **never** be pointed at a database containing edits you want to preserve. CI runs in a fresh environment to avoid this risk.
+
+**Unverified:** Visual browser tests, keyboard and viewport findings should be treated as pending until the `Browser acceptance` GitHub workflow completes successfully and artifacts are reviewed. Automated passing checks would not establish production security or accessibility conformance.
