@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {draft,buckets,transition,validateTask,deficiencyInbox,portfolio,caseNextAction} from './domain.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {draft,buckets,transition,validateTask,deficiencyInbox,portfolio,caseNextAction,isDateOnly} from './domain.ts';
 test('blocked is not complete; reopen first',()=>{assert.throws(()=>transition('blocked','completed'));transition('blocked','in progress');transition('in progress','completed')});
 test('exactly one known owner or explicit unassigned',()=>{validateTask({title:'A',state:'open',owner:null});assert.throws(()=>validateTask({title:'A',state:'open',owner:['Alex','Morgan']}))});
 test('draft uses only source application unresolved items',()=>{const s=draft({business:'Harbor',reference:'A1',stage:'Intake',contact:'Reed',tasks:[{title:'Intake',state:'completed'}],deficiencies:[{description:'Proof of address',verification:'unverified'}]});assert.match(s,/Proof of address/);assert.doesNotMatch(s,/declaration/)});
@@ -64,4 +64,9 @@ test('next action prioritizes unassigned and blocked tasks without pretending th
  assert.equal(second.sourceId,'T1');
  assert.equal(second.owner,null);
  assert.match(second.title,/Assign task/);
+});
+
+test('date-only validation accepts leap dates but rejects impossible or ambiguous dates',()=>{
+ assert.equal(isDateOnly('2028-02-29'),true);
+ for(const value of ['2026-02-29','2026-02-30','2026-13-01','2026-00-01','2026-01-00','2026-1-01','2026-01-01T00:00:00Z',''])assert.equal(isDateOnly(value),false,value);
 });
