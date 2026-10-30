@@ -421,3 +421,10 @@ button:disabled:hover{transform:none;box-shadow:none}
 .portfolio-export{background:#ffffff0d;border:1px solid #e9c99380;color:#f8e9cd;min-height:42px;padding:12px 18px}
 .portfolio-export:hover{background:#ffffff1f;border-color:#f8e9cd;color:#fff}
 @media(max-width:700px){.portfolio-intro-actions{align-items:stretch;flex-direction:column}.portfolio-intro-actions button{width:100%}}
+
+
+/* Supervisor decision record: exact blockers, never hidden behind a score */
+.override-list{padding:10px 16px 10px 29px;margin:14px 0;border:1px solid #e3d3b5;border-radius:7px;background:#fffbef;
+ color:#624d2e;max-height:230px;overflow-y:auto;font-size:12px;line-height:1.6}
+.override-list li{padding:5px 0}
+.override-list li+li{border-top:1px solid #f0e4ce}
