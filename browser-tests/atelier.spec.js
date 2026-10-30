@@ -1,4 +1,5 @@
-import {test,expect,devices} from '@playwright/test';
+import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
 
 /**
  * The CI job runs this suite against a disposable, synthetic-only DB_PATH.
@@ -36,6 +37,23 @@ test('portfolio displays 14 active cases and opens the selected case',async ({pa
  await expect(page.locator('.case-hero')).toContainText('Harbor & Pine Studio');
  await expect(page.locator('.case-hero [aria-current="step"]')).toContainText('Intake');
  await expect(page.locator('.alert')).toContainText('Proof of business address');
+});
+
+test('portfolio CSV excludes withdrawn work and neutralizes spreadsheet formulas',async ({page,request})=>{
+ const app=await request.post('/api/create',{data:{client:'Synthetic pilot',business:'=SUM(1,1)',reference:'CSV-TEST-001',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'}});
+ expect(app.status()).toBe(200);
+ await page.goto('/');
+ await page.locator('nav button[data-view="portfolio"]').click();
+ const pending=page.waitForEvent('download');
+ await page.locator('#portfolioExport').click();
+ const download=await pending;
+ expect(download.suggestedFilename()).toBe('bridge-street-active-case-ledger.csv');
+ const content=await readFile(await download.path(),'utf8');
+ expect(content).toContain('"Reference","Business"');
+ expect(content).toContain('CSV-TEST-001');
+ expect(content).toContain("'=SUM(1,1)");
+ expect(content).not.toContain('SBP-2026-015');
+ expect(content.trim().split(/\r?\n/)).toHaveLength(16); // header + 15 active
 });
 
 test('evidence desk routes the right deficiency into its review form',async ({page})=>{
