@@ -62,3 +62,12 @@ Four domain tests passed. Live HTTP checks passed for seed counts (15 applicatio
 - [ ] Restore/import UI, automated backups and migration upgrades
 - [ ] Full mobile, accessibility and adversarial security review
 
+
+## Atelier UI / second movement (feature branch)
+
+The Atelier visual system is served locally from `public/atelier.css` and requires no remote assets.
+The **Portfolio** stage board derives case counts and outstanding work from active application records.
+The **Evidence desk** lists unresolved deficiencies, separates unverified work from responses requiring verification, and routes staff into the correct application's review form. It never implies an authority's approval.
+The **Today** exception alert is now calculated from the unresolved register instead of a hardcoded example.
+
+Run `npm test` to execute domain and browser-script syntax checks. GitHub Actions also starts an isolated synthetic SQLite instance, exercises the API and confirms the stylesheet and both navigation routes can be served. These checks do **not** replace visual accessibility, keyboard, tablet or device-level QA. The demo remains local-only and is not suitable for real client records.
