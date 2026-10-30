@@ -3,10 +3,22 @@ const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=
 const opts=(values,current)=>values.map(v=>`<option ${v===current?'selected':''}>${esc(v)}</option>`).join('');
 const tags=flags=>flags.map(f=>`<span class="tag ${f.toLowerCase().replaceAll(' ','-')}">${esc(f)}</span>`).join('');
 async function load(){try{data=await fetch('/api').then(r=>r.json());render()}catch{ $('#notice').textContent='Cannot reach local storage. Start the server and reload. Your saved records remain on disk.'}}
-async function post(path,body){try{const r=await fetch('/api/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.error);$('#notice').textContent='Saved locally.';await load();return d}catch(e){$('#notice').textContent=e.message;throw e}}
+async function post(path,body){try{const r=await fetch('/api/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok){const err=Error(d.error||'Save failed');err.status=r.status;throw err;}$('#notice').textContent='Saved locally.';await load();return d}catch(e){$('#notice').textContent=e.message;throw e}}
 function current(){return data.apps.find(a=>a.id===selected)}
 function download(name,body,type='text/plain'){const u=URL.createObjectURL(new Blob([body],{type}));const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
-function modal(title,fields,submit){$('#dialogForm').innerHTML=`<h2>${title}</h2>${fields}<p id="formerror" role="alert"></p><div class="actions"><button class="primary">Save</button><button type="button" id="cancel">Cancel</button></div>`;$('#dialog').showModal();$('#cancel').onclick=()=>$('#dialog').close();$('#dialogForm').onsubmit=async e=>{e.preventDefault();try{await submit(Object.fromEntries(new FormData(e.target)));$('#dialog').close()}catch(e){$('#formerror').textContent=e.message}}}
+function modal(title,fields,submit){
+ const form=$('#dialogForm');
+ form.innerHTML=`<h2>${esc(title)}</h2>${fields}<p id="formerror" role="alert"></p><div class="conflict-actions" id="conflictActions" hidden><p class="muted">Someone changed this case after you opened it. Your inputs are still here; copy them before refreshing, then review and reapply your intended edit.</p><button type="button" id="copyUnsaved">Copy unsaved values</button><button type="button" id="reloadLatest">Load latest record</button></div><div class="actions"><button class="primary" type="submit" id="modalSave">Save</button><button type="button" id="cancel">Cancel</button></div>`;
+ $('#dialog').showModal();
+ $('#cancel').onclick=()=>$('#dialog').close();
+ $('#copyUnsaved').onclick=async()=>{const values=JSON.stringify(Object.fromEntries(new FormData(form)),null,2);try{await navigator.clipboard.writeText(values);$('#formerror').textContent='Unsaved values copied. Load the latest record before applying them again.';}catch{$('#formerror').textContent='Clipboard permission unavailable. Select and copy your current form fields before loading the latest record.';}};
+ $('#reloadLatest').onclick=async()=>{$('#dialog').close();await load();$('#notice').textContent='Latest saved record loaded. Reopen the task or deficiency to reapply your edit.'};
+ form.onsubmit=async e=>{e.preventDefault();const button=$('#modalSave');if(button.disabled)return;button.disabled=true;button.textContent='Saving…';
+  try{await submit(Object.fromEntries(new FormData(form)));$('#dialog').close();}
+  catch(error){$('#formerror').textContent=error.message||'Save failed. Your inputs are preserved.';if(error.status===409){$('#conflictActions').hidden=false;}}
+  finally{button.disabled=false;button.textContent='Save';}
+ };
+}
 const field=(label,name,value='',type='text')=>`<label for="f-${name}">${label}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}">`;
 const select=(label,name,values,value)=>`<label for="f-${name}">${label}</label><select id="f-${name}" name="${name}">${opts(values,value)}</select>`;
 function taskRows(rows){return rows.map(t=>`<tr><td><button class="link" data-open="${t.appId}">${esc(t.title)}</button><small>${esc(t.business)} · ${esc(t.reference)}</small></td><td>${tags(t.flags)}</td><td>${esc(t.owner||'Unassigned')}</td><td>${esc(t.due||'No date')}<small>${esc(t.provenance)}</small></td><td><button data-edit-task="${t.id}" data-app="${t.appId}">Update →</button></td></tr>`).join('')}
