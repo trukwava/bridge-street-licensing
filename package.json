@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "start": "node server.ts",
-    "test": "node --check public/app.js && node --test test.ts"
+    "test": "node --check public/app.js && node --test test.ts",
+    "backup:export": "node backup.ts export",
+    "backup:verify": "node backup.ts verify",
+    "backup:restore": "node backup.ts restore"
   },
   "engines": {
     "node": ">=24"
