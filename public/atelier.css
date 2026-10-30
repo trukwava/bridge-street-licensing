@@ -359,3 +359,29 @@ footer{border-top:1px solid #e4e4d9;margin-top:36px;color:#8a9389;font-size:10px
  .finder-results{padding:0 10px 5px}
  .finder-help{padding:13px 17px}
 }
+
+
+/* Case brief — a legible source-linked answer to "what happens next?" */
+.next-action-card{position:relative;overflow:hidden;margin:17px 0 20px;padding:21px 27px 24px;
+ border:1px solid #bfcfc0;border-left:4px solid #bd9357;border-radius:9px;
+ background:linear-gradient(114deg,#f8faf5 0%,#f5f3e9 100%);
+ box-shadow:0 12px 28px #173c2710}
+.next-action-card:before{content:"";pointer-events:none;position:absolute;right:-55px;bottom:-112px;width:270px;height:270px;
+ border:1px solid #c7ae7b44;border-radius:50%;box-shadow:0 0 0 31px #d3ba8c18,0 0 0 65px #d3ba8c0b}
+.next-action-header{display:flex;align-items:center;justify-content:space-between;gap:12px;position:relative}
+.next-action-header .eyebrow{color:#866c42;font-size:9px}
+.next-action-header .eyebrow:before{background:#9e824f}
+.next-action-type{font:800 9px var(--at-sans);text-transform:uppercase;letter-spacing:1px;
+ color:#416954;background:#e4eee4;border:1px solid #c7dcc8;border-radius:4px;padding:6px 9px}
+.next-action-body{position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:25px;margin-top:13px}
+.next-action-body h2{font:500 clamp(24px,2.4vw,34px)/1.1 var(--at-serif);max-width:850px;margin:0 0 9px}
+.next-action-body p{max-width:770px;margin:0 0 13px;font-size:12px;color:#66766a}
+.next-action-body .primary{flex-shrink:0;position:relative}
+.next-action-meta{display:flex;flex-wrap:wrap;gap:8px 19px;font-size:10px;color:#65746a}
+.next-action-meta strong{color:#2a4838}
+@media(max-width:700px){
+ .next-action-card{padding:17px 16px 20px}
+ .next-action-body{align-items:flex-start;flex-direction:column;gap:17px}
+ .next-action-body .primary{width:100%}
+ .next-action-body h2{font-size:27px}
+}
