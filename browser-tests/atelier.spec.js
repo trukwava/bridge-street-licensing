@@ -144,6 +144,60 @@ test('stale edits never overwrite newer work and offer an explicit recovery path
  await expect(page.locator('#notice')).toContainText('Latest saved record loaded');
 });
 
+test('supervisor override enumerates real blockers and retains the deficiency',async ({page})=>{
+ await page.goto('/');
+ await page.locator('#quickFind').click();
+ await page.locator('#finderSearch').fill('SBP-2026-001');
+ await page.locator('.finder-result').click();
+ await page.locator('#advance').click();
+ await expect(page.locator('#dialog h2')).toContainText('Review stage advancement');
+ await expect(page.locator('.override-list')).toContainText('Proof of business address');
+ await page.locator('#f-reason').fill('Demo supervisor reviewed and accepted unresolved address evidence for next preparation stage');
+ await page.locator('#modalSave').click();
+ await expect(page.locator('#dialog')).not.toBeVisible();
+ await expect(page.locator('.case-hero [aria-current="step"]')).toContainText('Preparation');
+ await expect(page.locator('.alert')).toContainText('Proof of business address');
+ await expect(page.locator('.timeline')).toContainText('Supervisor override');
+});
+
+test('workflow version editor creates a new template without rewriting old case snapshots',async ({page,request})=>{
+ await page.goto('/');
+ await page.locator('nav button[data-view="templates"]').click();
+ await page.locator('#template').click();
+ await expect(page.locator('#dialog h2')).toContainText('Publish workflow version 2');
+ await page.locator('#tasks').fill('First required task\\nSecond required task');
+ await page.locator('#stage0').fill('Approved synthetic onboarding message:');
+ await page.locator('#modalSave').click();
+ await expect(page.locator('#dialog')).not.toBeVisible();
+ await expect(page.locator('.panel').first()).toContainText('Version 2');
+ const state=await (await request.get('/api')).json();
+ const old=state.apps.find(a=>a.id==='BS-001');
+ expect(old.templateVersion).toBe(1);
+ const resp=await request.post('/api/create',{data:{client:'Pilot client',business:'Template test case',reference:'PILOT-TEMPLATE-002',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'}});
+ expect(resp.status()).toBe(200);
+ const created=await resp.json();
+ expect(created.templateVersion).toBe(2);
+ const drafted=await request.post('/api/draft',{data:{id:created.id,revision:created.revision}});
+ expect(drafted.status()).toBe(200);
+ expect((await drafted.json()).drafts[0].body).toContain('Approved synthetic onboarding message:');
+});
+
+test('archived cases are read-only until deliberately reactivated',async ({page})=>{
+ await page.goto('/');
+ await page.locator('#quickFind').click();
+ await page.locator('#finderSearch').fill('SBP-2026-015');
+ await page.locator('.finder-result').click();
+ await expect(page.locator('.alert').first()).toContainText('Read-only record');
+ await expect(page.locator('#advance')).toBeDisabled();
+ await expect(page.locator('#draft')).toBeDisabled();
+ await expect(page.locator('[data-edit-task]').first()).toBeDisabled();
+ await page.locator('#appstatus').click();
+ await page.locator('#f-status').selectOption('active');
+ await page.locator('#modalSave').click();
+ await expect(page.locator('#advance')).toBeEnabled();
+ await expect(page.locator('[data-edit-task]').first()).toBeEnabled();
+});
+
 test('mobile desk is navigable and captures a screenshot',async ({page})=>{
  await page.setViewportSize({width:390,height:844});
  await page.goto('/');
