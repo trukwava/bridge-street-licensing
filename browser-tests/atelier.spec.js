@@ -95,7 +95,7 @@ test('mobile desk is navigable and captures a screenshot',async ({page})=>{
  await page.screenshot({path:'test-results/atelier-today-mobile.png',fullPage:true,animations:'disabled'});
  await page.locator('nav button[data-view="portfolio"]').click();
  await expect(page.locator('.portfolio-lane')).toHaveCount(5);
- await expect(page.locator('.portfolio-board').evaluate(el=>el.scrollWidth>el.clientWidth)).resolves.toBe(true);
+ expect(await page.locator('.portfolio-board').evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
  await page.screenshot({path:'test-results/atelier-portfolio-mobile.png',fullPage:true,animations:'disabled'});
  await page.locator('#quickFind').click();
  await expect(page.locator('#finderSearch')).toBeFocused();
