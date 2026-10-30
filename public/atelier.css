@@ -385,3 +385,8 @@ footer{border-top:1px solid #e4e4d9;margin-top:36px;color:#8a9389;font-size:10px
  .next-action-body .primary{width:100%}
  .next-action-body h2{font-size:27px}
 }
+
+
+.portfolio-case-next{display:flex;gap:9px;align-items:baseline;margin-top:13px;padding-top:12px;border-top:1px solid #e7e9df;
+ color:#345845;font-size:10px;font-weight:750;line-height:1.55;text-align:left;overflow-wrap:anywhere}
+.portfolio-case-next>span{font-size:9px;letter-spacing:.8px;font-weight:800;text-transform:uppercase;color:#9b885e;flex-shrink:0}
