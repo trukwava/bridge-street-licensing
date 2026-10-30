@@ -320,3 +320,42 @@ footer{border-top:1px solid #e4e4d9;margin-top:36px;color:#8a9389;font-size:10px
  .triage-summary strong{font-size:34px}
  .triage-toolbar input{width:100%;min-width:0}
 }
+
+
+/* ATELIER / CASE FINDER — fast search as an intentional command surface */
+.finder-launch{display:inline-flex;align-items:center;gap:9px;background:#fcfbf5;
+ border-color:#dfded3;color:#305444;font-size:11px;font-weight:750;
+ margin-left:auto;margin-right:16px;padding:8px 12px}
+.finder-launch>span{font:24px/0.8 var(--at-serif);color:#b29260}
+.finder-launch kbd{font:700 9px var(--at-sans);color:#879085;background:#eceee7;border:1px solid #dfe2d9;
+ border-radius:4px;padding:5px 6px}
+#caseFinder{width:min(570px,calc(100vw - 26px));max-width:none;padding:0;border:1px solid #cbb995;
+ background:#fffdf7;border-radius:12px;box-shadow:0 35px 120px #092e266c;max-height:86vh;overflow:auto}
+#caseFinder::backdrop{background:#061d1abf;backdrop-filter:blur(6px)}
+.finder-top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
+ padding:28px 29px 19px;border-bottom:1px solid #e8e4d9;
+ background:linear-gradient(128deg,#fcf9ef,#f3ede0)}
+.finder-top h2{font:500 36px var(--at-serif);margin:7px 0 7px}
+.finder-top p{color:#748073;font-size:12px;margin:0}
+#finderClose{min-width:34px;min-height:34px;padding:6px 9px;font-size:13px}
+#caseFinder label{display:block;margin:21px 28px 8px;color:#526651}
+#finderSearch{display:block;width:calc(100% - 56px);max-width:none;margin:0 28px 14px;padding:15px 15px;
+ font-size:15px;background:#fdfcf8;border:1px solid #cad6c7;box-shadow:0 3px 10px #24453009}
+.finder-results{padding:0 18px 8px;display:flex;flex-direction:column;gap:5px;min-height:62px}
+.finder-result{display:flex;align-items:flex-start;flex-direction:column;gap:6px;text-align:left;
+ padding:15px 17px;min-height:80px;background:#fffcf7;border:1px solid #ece9de;width:100%;border-radius:7px}
+.finder-result:hover,.finder-result:focus-visible{background:#f0f4ec;border-color:#a2bba6;transform:none}
+.finder-result-ref{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;font-weight:750;color:#9e885c}
+.finder-result strong{font:500 20px var(--at-serif);color:#224333}
+.finder-result>span:last-child{font-size:10px;color:#7f887c}
+.finder-empty{font:italic 16px var(--at-serif);text-align:center;padding:20px;color:#7c8779}
+.finder-help{padding:14px 28px;margin:0;border-top:1px solid #ece9df;background:#f7f5ed;
+ font-size:10px;color:#8a9185;line-height:1.6}
+@media(max-width:900px){.finder-launch kbd{display:none}.finder-launch{margin-right:8px}}
+@media(max-width:700px){.finder-launch{padding:7px 9px;font-size:10px;margin-right:2px}.finder-launch>span{font-size:19px}
+ .finder-top{padding:22px 18px 16px}.finder-top h2{font-size:30px}
+ #caseFinder label{margin:16px 18px 8px}
+ #finderSearch{width:calc(100% - 36px);margin:0 18px 11px}
+ .finder-results{padding:0 10px 5px}
+ .finder-help{padding:13px 17px}
+}
