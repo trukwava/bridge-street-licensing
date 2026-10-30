@@ -118,3 +118,18 @@ The app remains a **single demo organization with fixed demo actor identity**, n
 ### Adversarial checks
 
 CI injects HTML-like text into a synthetic case name and verifies that the portfolio and application workspace render it as inert text, never as markup. API integration tests reject oversized notes and evidence references, invalid dates, and unreasoned cancellations. These tests strengthen the demonstration but are **not** a substitute for application security testing with real authentication and tenant isolation.
+
+## Offline synthetic backup and recovery
+
+The repository includes a checksum-verified **demo-only** archive tool, `backup.ts`. It is not exposed through HTTP. Stop the local demo server before restoring and ideally before exporting.
+
+```sh
+node backup.ts export ./backups/demo-archive.json
+node backup.ts verify ./backups/demo-archive.json
+# DANGER: Replaces the entire local demo dataset. Stop the server and archive current data first.
+node backup.ts restore ./backups/demo-archive.json --replace
+```
+
+The archive preserves case revisions, task and deficiency records, drafts, reference records, historical template snapshots, handoffs, activity, and versioned workflow templates. The tool checks a SHA-256 checksum, validates record structure and referential integrity, refuses to overwrite an archive filename, and restores in a database transaction with rollback on failure.
+
+**Limits:** SHA-256 is a corruption check, not encryption, access control, or defense against an attacker who recomputes the checksum. Archives may contain any information entered into the demo. Do not enter or upload real client data. This is not a production backup-and-disaster-recovery solution.
