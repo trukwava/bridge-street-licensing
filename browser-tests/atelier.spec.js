@@ -55,6 +55,20 @@ test('evidence desk routes the right deficiency into its review form',async ({pa
  await page.locator('#cancel').click();
 });
 
+test('next-action brief links to the real deficiency without inventing a deadline',async ({page})=>{
+ await page.goto('/');
+ await page.locator('#quickFind').click();
+ await page.locator('#finderSearch').fill('SBP-2026-001');
+ await page.locator('.finder-result').click();
+ const brief=page.locator('.next-action-card');
+ await expect(brief).toContainText('Proof of business address');
+ await expect(brief).toContainText('Due: Not entered');
+ await expect(brief).toContainText('Alex');
+ await brief.locator('[data-next-def]').click();
+ await expect(page.locator('#dialog')).toBeVisible();
+ await expect(page.locator('#dialog h2')).toContainText('Review deficiency');
+});
+
 test('case finder uses actual application identity and keyboard shortcut',async ({page})=>{
  await page.goto('/');
  await page.keyboard.press('Control+k');
