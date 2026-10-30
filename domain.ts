@@ -48,3 +48,41 @@ export function portfolio(apps: any[]) {
   };
  });
 }
+
+
+/**
+ * Exactly one recommended next action per case. Read-only advisory, never approval.
+ * Response verification takes precedence; then overdue evidence and work blockers.
+ * Date-only deadlines remain source dates and are not inferred from legislation.
+ */
+export function caseNextAction(a: any, today: string) {
+ if (a.status !== 'active') return {kind:'inactive',sourceId:null,title:'No active action',owner:null,due:null,
+  explanation:'This application is not active. Review its recorded status before making changes.'};
+ const defs=(a.deficiencies || []).filter((d:any)=>d.verification!=='verified');
+ const tasks=(a.tasks || []).filter((t:any)=>!['completed','cancelled'].includes(t.state));
+ const received=defs.find((d:any)=>d.verification==='received');
+ const overdueEvidence=defs.filter((d:any)=>d.due && d.due<today).sort((x:any,y:any)=>x.due.localeCompare(y.due))[0];
+ const blockedTask=tasks.find((t:any)=>t.state==='blocked');
+ const unassignedTask=tasks.find((t:any)=>!t.owner);
+ const overdueTask=tasks.filter((t:any)=>t.due&&t.due<today).sort((x:any,y:any)=>x.due.localeCompare(y.due))[0];
+ const evidence=received||overdueEvidence||(tasks.length?null:defs[0])||defs[0];
+ if(received) return {kind:'deficiency',sourceId:received.id,title:'Verify response: '+received.description,
+  owner:a.owner||null,due:received.due||null,explanation:'A client response was recorded but the evidence is not verified.'};
+ if(overdueEvidence) return {kind:'deficiency',sourceId:overdueEvidence.id,title:'Request overdue evidence: '+overdueEvidence.description,
+  owner:a.owner||null,due:overdueEvidence.due,explanation:'User-entered due date has passed; no evidence verification recorded.'};
+ if(blockedTask) return {kind:'task',sourceId:blockedTask.id,title:'Unblock task: '+blockedTask.title,
+  owner:blockedTask.owner||null,due:blockedTask.due||null,explanation:'Blocked work must be reopened before it can be completed.'};
+ if(unassignedTask) return {kind:'task',sourceId:unassignedTask.id,title:'Assign task: '+unassignedTask.title,
+  owner:null,due:unassignedTask.due||null,explanation:'No accountable task owner has been assigned.'};
+ if(overdueTask) return {kind:'task',sourceId:overdueTask.id,title:'Follow up on task: '+overdueTask.title,
+  owner:overdueTask.owner||null,due:overdueTask.due,explanation:'The user-entered deadline has passed and the task remains open.'};
+ if(evidence) return {kind:'deficiency',sourceId:evidence.id,title:'Collect evidence: '+evidence.description,
+  owner:a.owner||null,due:evidence.due||null,explanation:'The deficiency remains unresolved; verify evidence before marking it complete.'};
+ if(tasks.length){
+  const first=[...tasks].sort((x:any,y:any)=>(x.due||'9999-12-31').localeCompare(y.due||'9999-12-31'))[0];
+  return {kind:'task',sourceId:first.id,title:'Progress task: '+first.title,owner:first.owner||null,
+   due:first.due||null,explanation:'An open task remains in the application checklist.'};
+ }
+ return {kind:'review',sourceId:null,title:'Ready for coordinator review',owner:a.owner||null,due:null,
+  explanation:'No outstanding task or unverified deficiency is recorded. Stage advancement still requires staff review.'};
+}
