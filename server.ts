@@ -2,17 +2,17 @@ import {createServer} from 'node:http';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {stages,users,validateTask,transition,outstanding,draft,buckets,deficiencyInbox,portfolio,caseNextAction,isDateOnly} from './domain.ts';
+import {stages,users,validateTask,transition,outstanding,draft,buckets,deficiencyInbox,portfolio,caseNextAction,isDateOnly,sampleFollowupIntros} from './domain.ts';
 const root=fileURLToPath(new URL('.',import.meta.url)); mkdirSync(root+'data',{recursive:true});
 const db=new DatabaseSync(process.env.DB_PATH || root+'data/demo.sqlite');
 db.exec('CREATE TABLE IF NOT EXISTS records (id TEXT PRIMARY KEY, org TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS templates (version INTEGER PRIMARY KEY, body TEXT NOT NULL);');
-const template={version:1,name:'Sample Business Permit',tasks:['Confirm intake details','Review supporting documents','Prepare application checklist'],stages,approved:true,followups:Object.fromEntries(stages.map(s=>[s,`Sample ${s} follow-up v1`]))};
+const template={version:1,name:'Sample Business Permit',tasks:['Confirm intake details','Review supporting documents','Prepare application checklist'],stages,approved:true,followupIntros:sampleFollowupIntros,followups:Object.fromEntries(stages.map(s=>[s,`Sample ${s} follow-up v1`]))};
 db.prepare('INSERT OR IGNORE INTO templates VALUES (?,?)').run(1,JSON.stringify(template));
 function all(){return db.prepare("SELECT body FROM records WHERE org='demo'").all().map((r:any)=>JSON.parse(r.body));}
 function get(id:string){const r:any=db.prepare("SELECT body FROM records WHERE id=? AND org='demo'").get(id);if(!r)throw Error('Application not found');return JSON.parse(r.body);}
 function audit(a:any,action:string){a.activity.unshift({at:new Date().toISOString(),actor:'Taylor (demo supervisor)',action});}
 function seed(){db.prepare("DELETE FROM records WHERE org='demo'").run();for(let i=1;i<=15;i++){const id='BS-'+String(i).padStart(3,'0');const a:any={id,revision:1,client:'Client '+i,business:i===1?'Harbor & Pine Studio':i===2?'Harbour and Pine Studio':['Juniper Market','Cedar Workshop','Canal Coffee','Elm Design','Northside Books'][i%5]+' '+i,reference:'SBP-2026-'+String(i).padStart(3,'0'),type:'Sample Business Permit',jurisdiction:'Fictional demonstration jurisdiction',contact:i<3?'Jordan Reed':i===3?'Casey Reed':'Sample Contact '+i,email:'',owner:users[(i-1)%4],stage:stages[(i-1)%5],priority:i===1?'High':'Normal',status:i===15?'withdrawn':'active',templateVersion:1,templateSnapshot:template,tasks:[],deficiencies:[],documents:[],mailings:[],payments:[],drafts:[],handoffs:[],activity:[]};for(let j=0;j<(i<=10?3:2);j++){const n=(i-1)*3+j;a.tasks.push({id:id+'-T'+j,title:template.tasks[j],owner:i===4&&j<2?null:users[n%4],state:i===1?'completed':i===2&&j===0?'blocked':i===3&&j===0?'awaiting response':'open',stage:a.stage,dependencies:j===1?[id+'-T0']:[],due:i>=2&&i<=4&&j===0?'2026-10-20':null,provenance:'User-entered sample date',revision:1});}if(i<=10)a.deficiencies.push({id:id+'-D1',description:i===1?'Proof of business address':i===2?'Signed applicant declaration':'Supporting document clarification '+i,evidence:'Synthetic intake checklist, item '+i,requested:'2026-10-21',due:null,response:'',verification:'unverified',resolution:''});if(i===1)a.documents.push({label:'Intake checklist',reference:'demo://intake/BS-001'});audit(a,'Synthetic demo record created');db.prepare('INSERT INTO records VALUES (?,?,?,?)').run(id,'demo',1,JSON.stringify(a));}}
-function resetDemo(){db.prepare('DELETE FROM templates WHERE version > 1').run();seed();}
+function resetDemo(){db.prepare('DELETE FROM templates WHERE version > 1').run();db.prepare('INSERT OR REPLACE INTO templates (version,body) VALUES (?,?)').run(1,JSON.stringify(template));seed();}
 if(!all().length)seed();
 function save(a:any,rev:number){a.revision=rev+1;const r=db.prepare("UPDATE records SET body=?,revision=? WHERE id=? AND org='demo' AND revision=?").run(JSON.stringify(a),a.revision,a.id,rev);if(!r.changes)throw Error('Stale record: reload before saving. Your edit was not applied.');}
 const server=createServer(async(req,res)=>{try{const url=new URL(req.url!,'http://localhost');if(!url.pathname.startsWith('/api')){const p=url.pathname==='/'?'index.html':url.pathname.slice(1);if(!['index.html','app.js','style.css','atelier.css'].includes(p)){res.writeHead(404).end();return;}res.setHeader('Content-Type',p.endsWith('.css')?'text/css':p.endsWith('.js')?'text/javascript':'text/html');res.end(readFileSync(root+'public/'+p));return;}
@@ -22,7 +22,17 @@ let b:any={};if(req.method!=='GET'){let raw='';for await(const c of req){raw+=c;
 let result:any;
 if(req.method==='GET'){const apps=all();const today=url.searchParams.get('today')||new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});result={apps,stages,users,templates:db.prepare('SELECT body FROM templates').all().map((r:any)=>JSON.parse(r.body)),today:buckets(apps,today),deficiencyInbox:deficiencyInbox(apps,today),portfolio:portfolio(apps),nextActions:Object.fromEntries(apps.map((a:any)=>[a.id,caseNextAction(a,today)]))};}
 else if(url.pathname==='/api/reset'){resetDemo();result={ok:true};}
-else if(url.pathname==='/api/template'){const current:any=db.prepare('SELECT MAX(version) AS v FROM templates').get();const v=current.v+1;const tasks=String(b.tasks||'').split('\n').map((s:string)=>s.trim()).filter(Boolean);if(!tasks.length||tasks.length>30)throw Error('Enter 1–30 task titles');db.prepare('INSERT INTO templates VALUES (?,?)').run(v,JSON.stringify({...template,version:v,tasks}));result={version:v};}
+else if(url.pathname==='/api/template'){
+ const current:any=db.prepare('SELECT body FROM templates ORDER BY version DESC LIMIT 1').get();
+ const prior=JSON.parse(current.body);
+ const v=prior.version+1;
+ const tasks=String(b.tasks||'').split('\n').map((s:string)=>s.trim()).filter(Boolean);
+ if(!tasks.length||tasks.length>30||tasks.some((title:string)=>title.length>160))throw Error('Enter 1–30 task titles (each under 160 characters)');
+ const intros=Object.fromEntries(stages.map(stage=>[stage,String(b.followupIntros?.[stage]??prior.followupIntros?.[stage]??sampleFollowupIntros[stage]).trim()]));
+ if(Object.values(intros).some((value:any)=>!value||value.length>900))throw Error('Each stage follow-up requires 1–900 characters');
+ db.prepare('INSERT INTO templates VALUES (?,?)').run(v,JSON.stringify({...prior,version:v,tasks,approved:true,followupIntros:intros}));
+ result={version:v};
+}
 else if(url.pathname==='/api/create'){for(const k of ['client','business','reference','jurisdiction','owner','priority'])if(!String(b[k]||'').trim())throw Error(k+' is required');if(!users.includes(b.owner)||!['High','Normal','Low'].includes(b.priority))throw Error('Invalid owner or priority');
 for(const k of ['client','business','reference','jurisdiction','contact'])if(b[k]!==undefined&& (typeof b[k]!=='string'||b[k].length>180))throw Error(k+' must be text under 180 characters');
 const ref=String(b.reference).trim();
