@@ -46,6 +46,15 @@ test('observatory uses live counts and opens the source task',async ({page,reque
  await page.locator('nav button[data-view="observatory"]').click();
  await expect(page.locator('.obs-trace-grid')).toContainText('Stage overrides');
  await expect(page.locator('.obs-event')).toHaveCount(12);
+ const dl=page.waitForEvent('download');
+ await page.locator('#obsExport').click();
+ const artifact=await dl;
+ expect(artifact.suggestedFilename()).toMatch(/^bridge-street-shift-brief-\d{4}-\d{2}-\d{2}\.md$/);
+ const markdown=await readFile(await artifact.path(),'utf8');
+ expect(markdown).toContain('Synthetic demo only');
+ expect(markdown).toContain('Active case files: 14');
+ expect(markdown).toContain('Source ID: ');
+ expect(markdown).toContain('Generated from local synthetic case records');
  await page.screenshot({path:'test-results/atelier-observatory-desktop.png',fullPage:true,animations:'disabled'});
 });
 
