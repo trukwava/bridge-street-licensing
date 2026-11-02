@@ -175,30 +175,30 @@ function observatoryScreen(){
   ['Unverified evidence',c.unresolvedEvidence,'Active case deficiencies'],
   ['Coordinator review',c.coordinatorReview,'No unresolved items recorded']
  ];
- return \`<section class="obs-hero" aria-label="Operations observatory">
+ return `<section class="obs-hero" aria-label="Operations observatory">
  <div class="obs-orbit" aria-hidden="true"><div class="obs-orbit-center">B<span>STREET</span></div></div>
  <span class="eyebrow">Bridge Street / Observatory Nº 01</span>
  <h1>See the whole <em>operation.</em></h1>
  <p>One view of obligations, exceptions, and recorded decisions. Every number originates in the synthetic case register—not an approval score.</p>
- <div class="obs-asof">SOURCE REGISTER <span>As of \${esc(o.asOf)} · America/New_York</span></div></section>
+ <div class="obs-asof">SOURCE REGISTER <span>As of ${esc(o.asOf)} · America/New_York</span></div></section>
  <section class="obs-metrics" aria-label="Portfolio operating metrics">
- \${metrics.map(([label,value,note])=>\`<div class="obs-metric"><span>\${esc(label)}</span><strong>\${value}</strong><small>\${esc(note)}</small></div>\`).join('')}
+ ${metrics.map(([label,value,note])=>`<div class="obs-metric"><span>${esc(label)}</span><strong>${value}</strong><small>${esc(note)}</small></div>`).join('')}
  </section>
  <div class="obs-split">
  <section class="panel obs-priority" aria-labelledby="obs-attention-title">
- <div class="panelhead"><div><span class="detail-kicker">01 / EXCEPTION REGISTER</span><h2 id="obs-attention-title">What needs attention</h2></div><span class="tag">\${o.priorityTotal} flagged items</span></div>
+ <div class="panelhead"><div><span class="detail-kicker">01 / EXCEPTION REGISTER</span><h2 id="obs-attention-title">What needs attention</h2></div><span class="tag">${o.priorityTotal} flagged items</span></div>
  <p class="muted">Received evidence is prioritized for verification; then overdue evidence, blocked work, ownership gaps and overdue tasks. These are internal coordination priorities.</p>
- <div class="obs-actions">\${o.priorityItems.map((item,i)=>\`<button type="button" class="obs-action" data-obs-open="\${esc(item.appId)}" data-obs-source="\${esc(item.sourceId)}" data-obs-kind="\${esc(item.kind)}" aria-label="Open \${esc(item.title)} for \${esc(item.reference)}">
- <span class="obs-rank">\${String(i+1).padStart(2,'0')}</span>
- <span class="obs-action-main"><span class="detail-kicker">\${esc(item.reference)} · \${esc(item.business)}</span><strong>\${esc(item.title)}</strong><small>Owner: \${esc(item.owner||'Unassigned')} · Due: \${esc(item.due||'Not entered')}</small></span>
- <span class="obs-open-icon" aria-hidden="true">↗</span></button>\`).join('')||'<p class="empty">No flagged active-case exceptions. This does not imply regulatory approval.</p>'}</div>
- \${o.priorityTotal>o.priorityItems.length?\`<small>Showing \${o.priorityItems.length} of \${o.priorityTotal} flagged items.</small>\`:''}
+ <div class="obs-actions">${o.priorityItems.map((item,i)=>`<button type="button" class="obs-action" data-obs-open="${esc(item.appId)}" data-obs-source="${esc(item.sourceId)}" data-obs-kind="${esc(item.kind)}" aria-label="Open ${esc(item.title)} for ${esc(item.reference)}">
+ <span class="obs-rank">${String(i+1).padStart(2,'0')}</span>
+ <span class="obs-action-main"><span class="detail-kicker">${esc(item.reference)} · ${esc(item.business)}</span><strong>${esc(item.title)}</strong><small>Owner: ${esc(item.owner||'Unassigned')} · Due: ${esc(item.due||'Not entered')}</small></span>
+ <span class="obs-open-icon" aria-hidden="true">↗</span></button>`).join('')||'<p class="empty">No flagged active-case exceptions. This does not imply regulatory approval.</p>'}</div>
+ ${o.priorityTotal>o.priorityItems.length?`<small>Showing ${o.priorityItems.length} of ${o.priorityTotal} flagged items.</small>`:''}
  </section>
  <section class="obs-side">
  <div class="panel obs-integrity"><span class="detail-kicker">02 / RECORDED DECISIONS</span><h2>Trace of custody</h2>
- <div class="obs-trace-grid"><div><strong>\${c.recordedHandoffs}</strong><span>Handoffs</span></div><div><strong>\${c.recordedOverrides}</strong><span>Stage overrides</span></div><div><strong>\${c.acceptedDrafts}</strong><span>Accepted drafts</span></div><div><strong>\${c.receivedUnverified}</strong><span>Responses to verify</span></div></div>
+ <div class="obs-trace-grid"><div><strong>${c.recordedHandoffs}</strong><span>Handoffs</span></div><div><strong>${c.recordedOverrides}</strong><span>Stage overrides</span></div><div><strong>${c.acceptedDrafts}</strong><span>Accepted drafts</span></div><div><strong>${c.receivedUnverified}</strong><span>Responses to verify</span></div></div>
  <p>These counts include recorded history across active and archived cases. They measure documented actions, not staff authorization.</p></div>
  <section class="panel obs-history"><span class="detail-kicker">03 / ACTIVITY CHRONICLE</span><h2>Recent recorded activity</h2>
- <div class="obs-events">\${o.recentEvents.map(event=>\`<button class="obs-event" data-open="\${esc(event.appId)}" type="button"><span class="obs-event-date">\${esc(new Date(event.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}))} ET</span><strong>\${esc(event.action)}</strong><small>\${esc(event.reference)} · \${esc(event.actor)}</small></button>\`).join('')||'<p>No recorded activity found.</p>'}</div></section></section></div>
- <p class="obs-disclaimer">Synthetic demo observability only. No authentication, approval verification, statutory deadline calculation, or production audit assurance is provided.</p>\`;
+ <div class="obs-events">${o.recentEvents.map(event=>`<button class="obs-event" data-open="${esc(event.appId)}" type="button"><span class="obs-event-date">${esc(new Date(event.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}))} ET</span><strong>${esc(event.action)}</strong><small>${esc(event.reference)} · ${esc(event.actor)}</small></button>`).join('')||'<p>No recorded activity found.</p>'}</div></section></section></div>
+ <p class="obs-disclaimer">Synthetic demo observability only. No authentication, approval verification, statutory deadline calculation, or production audit assurance is provided.</p>`;
 }
