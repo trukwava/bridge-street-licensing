@@ -11,6 +11,39 @@ function csvCell(value){
  if(/^[\s]*[=+@-]/.test(text))text="'"+text;
  return '"'+text.replaceAll('"','""')+'"';
 }
+function exportObservatoryBrief(){
+ const o=data.observatory;
+ if(!o){$('#notice').textContent='Observatory data unavailable; reload before exporting.';return;}
+ const safe=value=>String(value??'').replace(/[\r\n]+/g,' ').trim();
+ const c=o.counts;
+ const rows=[
+  '# Bridge Street | Operations Shift Brief',
+  '',
+  'Synthetic demo only — internal coordination, not regulatory approval.',
+  'As of '+safe(o.asOf)+' (America/New_York)',
+  '',
+  '## Operating position',
+  '- Active case files: '+c.activeCases,
+  '- Overdue tasks: '+c.overdueTasks,
+  '- Blocked tasks: '+c.blockedTasks,
+  '- Unassigned tasks: '+c.unassignedTasks,
+  '- Unresolved evidence: '+c.unresolvedEvidence,
+  '- Received evidence awaiting verification: '+c.receivedUnverified,
+  '- Cases with no recorded unresolved items: '+c.coordinatorReview,
+  '- Recorded handoffs (all case statuses): '+c.recordedHandoffs,
+  '- Recorded stage overrides (all case statuses): '+c.recordedOverrides,
+  '',
+  '## Exception register ('+o.priorityTotal+' flagged items; showing up to 20)',
+  ...o.priorityItems.map((item,i)=>(i+1)+'. '+safe(item.reference)+' | '+safe(item.title)+' | Owner: '+safe(item.owner||'Unassigned')+' | Due: '+safe(item.due||'Not entered')+' | Source ID: '+safe(item.sourceId)),
+  '',
+  '## Latest recorded activity',
+  ...o.recentEvents.map(event=>'- '+safe(event.at)+' | '+safe(event.reference)+' | '+safe(event.action)+' | Actor: '+safe(event.actor)),
+  '',
+  'Generated from local synthetic case records. No data was sent.',
+  ''
+ ];
+ download('bridge-street-shift-brief-'+o.asOf+'.md',rows.join('\n'),'text/markdown;charset=utf-8');
+}
 function exportPortfolioCsv(){
  const columns=['Reference','Business','Client','Stage','Owner','Priority','Status','Open tasks','Unverified deficiencies','Next action'];
  const rows=data.apps.filter(a=>a.status==='active').map(a=>{
@@ -49,7 +82,7 @@ if(view==='workspace'){const a=current();const next=data.nextActions?.[a.id];con
 if(view==='templates'){html=`<div class="heading"><div><h1>Workflow library</h1><p>Published versions remain immutable. Each case retains its original tasks and approved draft wording.</p></div><button id="template" class="primary">+ Publish new version</button></div>${[...data.templates].sort((a,b)=>b.version-a.version).map(t=>`<section class="panel"><div class="panelhead"><h2>${esc(t.name)} <span class="tag">Version ${t.version}</span></h2><small>${t.approved?'Demo-approved wording':'Unapproved'}</small></div><p>Fictional workflow · No statutory date rules, portal connection, or legal advice</p><h3>Versioned task checklist</h3><ol>${t.tasks.map(item=>`<li>${esc(item)}</li>`).join('')}</ol><details class="template-details"><summary>Stage-specific follow-up wording</summary>${t.stages.map(stage=>`<div class="template-stage"><strong>${esc(stage)}</strong><p>${esc(t.followupIntros?.[stage]||'Uses the default sample wording for this stage')}</p></div>`).join('')}</details></section>`).join('')}`;}
 
 $('#app').innerHTML=html;bind();}
-function bind(){document.querySelectorAll('[data-obs-open]').forEach(b=>b.onclick=()=>{
+function bind(){if($('#obsExport'))$('#obsExport').onclick=exportObservatoryBrief;document.querySelectorAll('[data-obs-open]').forEach(b=>b.onclick=()=>{
  selected=b.dataset.obsOpen;view='workspace';render();
  const sourceId=b.dataset.obsSource;
  const selector=b.dataset.obsKind==='deficiency'?'[data-def]':'[data-edit-task]';
@@ -180,7 +213,7 @@ function observatoryScreen(){
  <span class="eyebrow">Bridge Street / Observatory Nº 01</span>
  <h1>See the whole <em>operation.</em></h1>
  <p>One view of obligations, exceptions, and recorded decisions. Every number originates in the synthetic case register—not an approval score.</p>
- <div class="obs-asof">SOURCE REGISTER <span>As of ${esc(o.asOf)} · America/New_York</span></div></section>
+ <div class="obs-asof">SOURCE REGISTER <span>As of ${esc(o.asOf)} · America/New_York</span></div><button id="obsExport" type="button" class="obs-export">Export shift brief ↓</button></section>
  <section class="obs-metrics" aria-label="Portfolio operating metrics">
  ${metrics.map(([label,value,note])=>`<div class="obs-metric"><span>${esc(label)}</span><strong>${value}</strong><small>${esc(note)}</small></div>`).join('')}
  </section>
