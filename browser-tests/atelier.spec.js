@@ -26,6 +26,29 @@ test('daily operations dashboard is readable, data-backed and styled',async ({pa
  await page.screenshot({path:'test-results/atelier-today-desktop.png',fullPage:true,animations:'disabled'});
 });
 
+
+test('observatory uses live counts and opens the source task',async ({page,request})=>{
+ await page.goto('/');
+ await page.locator('nav button[data-view="observatory"]').click();
+ await expect(page.getByRole('heading',{name:/see the whole operation/i})).toBeVisible();
+ await expect(page.locator('.obs-metric')).toHaveCount(6);
+ await expect(page.locator('.obs-metric').first()).toContainText('14');
+ await expect(page.locator('.obs-metric').nth(1)).toContainText('3');
+ await expect(page.locator('.obs-action')).not.toHaveCount(0);
+ const before=await (await request.get('/api')).json();
+ const candidate=before.observatory.priorityItems.find(item=>item.kind==='task');
+ expect(candidate).toBeTruthy();
+ await page.locator('.obs-action[data-obs-source="'+candidate.sourceId+'"]').click();
+ await expect(page.locator('.case-hero')).toContainText(candidate.reference);
+ await expect(page.locator('#dialog')).toBeVisible();
+ await expect(page.locator('#dialog h2')).toContainText('Update accountable task');
+ await page.locator('#cancel').click();
+ await page.locator('nav button[data-view="observatory"]').click();
+ await expect(page.locator('.obs-trace-grid')).toContainText('Stage overrides');
+ await expect(page.locator('.obs-event')).toHaveCount(12);
+ await page.screenshot({path:'test-results/atelier-observatory-desktop.png',fullPage:true,animations:'disabled'});
+});
+
 test('portfolio displays 14 active cases and opens the selected case',async ({page})=>{
  await page.goto('/');
  await page.locator('nav button[data-view="portfolio"]').click();
