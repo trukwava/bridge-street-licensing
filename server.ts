@@ -15,7 +15,19 @@ function seed(){db.prepare("DELETE FROM records WHERE org='demo'").run();for(let
 function resetDemo(){db.prepare('DELETE FROM templates WHERE version > 1').run();db.prepare('INSERT OR REPLACE INTO templates (version,body) VALUES (?,?)').run(1,JSON.stringify(template));seed();}
 if(!all().length)seed();
 function save(a:any,rev:number){a.revision=rev+1;const r=db.prepare("UPDATE records SET body=?,revision=? WHERE id=? AND org='demo' AND revision=?").run(JSON.stringify(a),a.revision,a.id,rev);if(!r.changes)throw Error('Stale record: reload before saving. Your edit was not applied.');}
-const server=createServer(async(req,res)=>{try{const url=new URL(req.url!,'http://localhost');if(!url.pathname.startsWith('/api')){const p=url.pathname==='/'?'index.html':url.pathname.slice(1);if(!['index.html','app.js','style.css','atelier.css'].includes(p)){res.writeHead(404).end();return;}res.setHeader('Content-Type',p.endsWith('.css')?'text/css':p.endsWith('.js')?'text/javascript':'text/html');res.end(readFileSync(root+'public/'+p));return;}
+const server=createServer(async(req,res)=>{try{
+ const host=String(req.headers.host||'').toLowerCase();
+ // Refuse arbitrary virtual hosts: this prototype deliberately binds to loopback.
+ if(!/^(localhost|127\\.0\\.0\\.1)(:\\d{1,5})?$/.test(host)){
+  res.writeHead(403,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify({error:'Local demo host required'}));return;
+ }
+ res.setHeader('X-Content-Type-Options','nosniff');
+ res.setHeader('X-Frame-Options','DENY');
+ res.setHeader('Referrer-Policy','no-referrer');
+ res.setHeader('Cross-Origin-Resource-Policy','same-origin');
+ res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+ res.setHeader('Cache-Control','no-store');
+ const url=new URL(req.url!,'http://localhost');if(!url.pathname.startsWith('/api')){const p=url.pathname==='/'?'index.html':url.pathname.slice(1);if(!['index.html','app.js','style.css','atelier.css'].includes(p)){res.writeHead(404).end();return;}res.setHeader('Content-Type',p.endsWith('.css')?'text/css':p.endsWith('.js')?'text/javascript':'text/html');res.end(readFileSync(root+'public/'+p));return;}
 if(url.pathname.startsWith('/api') && !['GET','POST'].includes(req.method||'')){res.writeHead(405,{'Allow':'GET, POST'}).end();return;}
 if(req.method!=='GET' && req.headers.origin && req.headers.origin!==`http://${req.headers.host}`)throw Error('Cross-origin writes rejected');
 let b:any={};if(req.method!=='GET'){let raw='';for await(const c of req){raw+=c;if(raw.length>100000)throw Error('Request too large');}b=JSON.parse(raw||'{}');}
