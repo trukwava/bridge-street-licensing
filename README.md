@@ -133,3 +133,13 @@ node backup.ts restore ./backups/demo-archive.json --replace
 The archive preserves case revisions, task and deficiency records, drafts, reference records, historical template snapshots, handoffs, activity, and versioned workflow templates. The tool checks a SHA-256 checksum, validates record structure and referential integrity, refuses to overwrite an archive filename, and restores in a database transaction with rollback on failure.
 
 **Limits:** SHA-256 is a corruption check, not encryption, access control, or defense against an attacker who recomputes the checksum. Archives may contain any information entered into the demo. Do not enter or upload real client data. This is not a production backup-and-disaster-recovery solution.
+
+## Fifth movement: operations observatory and local-host boundary
+
+The **Observatory** is a read-only portfolio view of the synthetic application's current operating position. It derives six visible metrics from actual case/task/deficiency records, surfaces a prioritized exception queue with stable source task or deficiency IDs, and shows recent recorded activity. Priority sorting is explicitly an *internal workflow convention*: received evidence needing verification, overdue evidence, blocked tasks, unassigned tasks, then overdue tasks. It is not a risk model, legal readiness score, or indication of regulatory approval.
+
+The **Export shift brief** action downloads a local Markdown handoff with the as-of date, exact counters, exception source IDs, and recorded activity. Nothing is sent. Both active-queue and whole-history counts label their scope explicitly; withdrawn records do not inflate active task statistics.
+
+The local HTTP server checks that its request Host is `localhost` or `127.0.0.1` and refuses foreign hostnames. It adds Content Security Policy, no-sniff, same-origin resource, no-referrer, frame-denial and no-store response headers. These controls reduce accidental exposure of the unauthenticated synthetic demo but **are not user authentication, production authorization, or tenant isolation**. The server still binds to the IPv4 loopback interface only.
+
+GitHub Actions exercises the Observatory domain counters, API source IDs, browser navigation into live task/deficiency forms, shift-brief download, and host/security-response headers. The latest commit's CI must be green before considering this iteration verified.
