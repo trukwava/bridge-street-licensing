@@ -516,3 +516,7 @@ main:focus{outline:none}
  .obs-action{gap:9px;padding:13px 9px}.obs-rank{flex:0 0 28px;font-size:22px}
  .obs-action-main strong{font-size:17px}
 }
+
+.obs-export{position:relative;z-index:2;display:inline-flex;align-items:center;margin-top:19px;padding:11px 17px;
+ background:#e9cd96;color:#1a3b30;border:1px solid #e9cd96;border-radius:6px;font-size:11px;font-weight:800}
+.obs-export:hover{background:#f4deb1;border-color:#f4deb1;color:#17392c}
