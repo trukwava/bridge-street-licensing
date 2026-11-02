@@ -18,7 +18,7 @@ function save(a:any,rev:number){a.revision=rev+1;const r=db.prepare("UPDATE reco
 const server=createServer(async(req,res)=>{try{
  const host=String(req.headers.host||'').toLowerCase();
  // Refuse arbitrary virtual hosts: this prototype deliberately binds to loopback.
- if(!/^(localhost|127\\.0\\.0\\.1)(:\\d{1,5})?$/.test(host)){
+ if(!/^(localhost|127\.0\.0\.1)(:\d{1,5})?$/.test(host)){
   res.writeHead(403,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify({error:'Local demo host required'}));return;
  }
  res.setHeader('X-Content-Type-Options','nosniff');
