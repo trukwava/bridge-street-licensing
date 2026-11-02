@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {request as httpRequest} from 'node:http';
 const base='http://127.0.0.1:4173/api';const read=()=>fetch(base).then(r=>r.json());async function write(p:string,b:any,code=200){const r=await fetch(base+'/'+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});assert.equal(r.status,code);return r.json()}
 await write('reset',{});let d=await read();
 
@@ -6,8 +7,13 @@ const normalHeaders=await fetch(base);
 assert.match(normalHeaders.headers.get('content-security-policy')||'',/default-src 'self'/);
 assert.equal(normalHeaders.headers.get('x-frame-options'),'DENY');
 assert.equal(normalHeaders.headers.get('cache-control'),'no-store');
-const foreignHost=await fetch(base,{headers:{host:'external.invalid'}});
-assert.equal(foreignHost.status,403,'Only loopback Host headers are allowed');
+const foreignHostStatus=await new Promise<number>((resolve,reject)=>{
+ const req=httpRequest(base,{headers:{Host:'external.invalid'}},res=>{
+  res.resume();res.on('end',()=>resolve(res.statusCode||0));
+ });
+ req.on('error',reject);req.end();
+});
+assert.equal(foreignHostStatus,403,'Only loopback Host headers are allowed');
 
 assert.equal(d.portfolio.reduce((n:any,g:any)=>n+g.count,0),14,'Live portfolio excludes withdrawn records');
 assert.equal(d.deficiencyInbox.length,10,'Seeded unresolved deficiencies are present');
