@@ -3,6 +3,15 @@ const base='http://127.0.0.1:4173/api';const read=()=>fetch(base).then(r=>r.json
 await write('reset',{});let d=await read();
 assert.equal(d.portfolio.reduce((n:any,g:any)=>n+g.count,0),14,'Live portfolio excludes withdrawn records');
 assert.equal(d.deficiencyInbox.length,10,'Seeded unresolved deficiencies are present');
+
+assert.equal(d.observatory.counts.activeCases,14,'Observatory excludes withdrawn case from live census');
+assert.equal(d.observatory.counts.overdueTasks,3);
+assert.equal(d.observatory.counts.unassignedTasks,2);
+assert.equal(d.observatory.counts.unresolvedEvidence,10);
+assert.equal(d.observatory.counts.recordedHandoffs,0);
+assert.equal(d.observatory.priorityItems.every((item:any)=>item.appId!=='BS-015'&&item.sourceId),true);
+assert.equal(d.observatory.priorityItems.some((item:any)=>item.appId==='BS-002'&&item.kind==='task'),true);
+
 assert.equal(d.nextActions['BS-001'].kind,'deficiency');
 assert.equal(d.nextActions['BS-001'].sourceId,'BS-001-D1');
 assert.match(d.nextActions['BS-001'].title,/Proof of business address/);
