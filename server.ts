@@ -2,7 +2,7 @@ import {createServer} from 'node:http';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {stages,users,validateTask,transition,outstanding,draft,buckets,deficiencyInbox,portfolio,caseNextAction,isDateOnly,sampleFollowupIntros} from './domain.ts';
+import {stages,users,validateTask,transition,outstanding,draft,buckets,deficiencyInbox,portfolio,caseNextAction,isDateOnly,sampleFollowupIntros,observatory} from './domain.ts';
 const root=fileURLToPath(new URL('.',import.meta.url)); mkdirSync(root+'data',{recursive:true});
 const db=new DatabaseSync(process.env.DB_PATH || root+'data/demo.sqlite');
 db.exec('CREATE TABLE IF NOT EXISTS records (id TEXT PRIMARY KEY, org TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS templates (version INTEGER PRIMARY KEY, body TEXT NOT NULL);');
@@ -20,7 +20,7 @@ if(url.pathname.startsWith('/api') && !['GET','POST'].includes(req.method||'')){
 if(req.method!=='GET' && req.headers.origin && req.headers.origin!==`http://${req.headers.host}`)throw Error('Cross-origin writes rejected');
 let b:any={};if(req.method!=='GET'){let raw='';for await(const c of req){raw+=c;if(raw.length>100000)throw Error('Request too large');}b=JSON.parse(raw||'{}');}
 let result:any;
-if(req.method==='GET'){const apps=all();const today=url.searchParams.get('today')||new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});if(!isDateOnly(today))throw Error('Invalid as-of date');result={apps,stages,users,templates:db.prepare('SELECT body FROM templates').all().map((r:any)=>JSON.parse(r.body)),today:buckets(apps,today),deficiencyInbox:deficiencyInbox(apps,today),portfolio:portfolio(apps),nextActions:Object.fromEntries(apps.map((a:any)=>[a.id,caseNextAction(a,today)]))};}
+if(req.method==='GET'){const apps=all();const today=url.searchParams.get('today')||new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});if(!isDateOnly(today))throw Error('Invalid as-of date');result={apps,stages,users,templates:db.prepare('SELECT body FROM templates').all().map((r:any)=>JSON.parse(r.body)),today:buckets(apps,today),deficiencyInbox:deficiencyInbox(apps,today),portfolio:portfolio(apps),nextActions:Object.fromEntries(apps.map((a:any)=>[a.id,caseNextAction(a,today)])),observatory:observatory(apps,today)};}
 else if(url.pathname==='/api/reset'){resetDemo();result={ok:true};}
 else if(url.pathname==='/api/template'){
  const current:any=db.prepare('SELECT body FROM templates ORDER BY version DESC LIMIT 1').get();
