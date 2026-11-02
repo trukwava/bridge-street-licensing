@@ -107,3 +107,45 @@ export function isDateOnly(value: unknown): boolean {
  const candidate=new Date(Date.UTC(y,m-1,d));
  return candidate.getUTCFullYear()===y && candidate.getUTCMonth()===m-1 && candidate.getUTCDate()===d;
 }
+
+
+/**
+ * Operations observatory: deterministic descriptive read model, not a legal or
+ * regulatory readiness score. Sources retain their case and item identity.
+ */
+export function observatory(apps:any[], today:string){
+ const active=apps.filter(a=>a.status==='active');
+ const openTasks=active.flatMap(a=>(a.tasks||[]).filter((t:any)=>!['completed','cancelled'].includes(t.state)).map((t:any)=>({caseFile:a,task:t})));
+ const unresolved=active.flatMap(a=>(a.deficiencies||[]).filter((d:any)=>d.verification!=='verified').map((d:any)=>({caseFile:a,deficiency:d})));
+ const recentEvents=apps.flatMap(a=>(a.activity||[]).filter((e:any)=>typeof e.at==='string'&&typeof e.action==='string').map((e:any)=>({
+  appId:a.id,reference:a.reference,business:a.business,at:e.at,action:e.action,actor:e.actor||'Demo actor'
+ }))).sort((a,b)=>b.at.localeCompare(a.at)||String(a.reference).localeCompare(String(b.reference))).slice(0,12);
+ const counts={
+  activeCases:active.length,
+  overdueTasks:openTasks.filter(({task})=>task.due&&task.due<today).length,
+  blockedTasks:openTasks.filter(({task})=>task.state==='blocked').length,
+  unassignedTasks:openTasks.filter(({task})=>!task.owner).length,
+  awaitingClient:openTasks.filter(({task})=>task.state==='awaiting response').length,
+  unresolvedEvidence:unresolved.length,
+  receivedUnverified:unresolved.filter(({deficiency})=>deficiency.verification==='received').length,
+  coordinatorReview:active.filter(a=>outstanding(a).length===0).length,
+  recordedHandoffs:apps.reduce((n,a)=>n+(a.handoffs||[]).length,0),
+  recordedOverrides:apps.reduce((n,a)=>n+(a.activity||[]).filter((e:any)=>typeof e.action==='string'&&e.action.includes('Supervisor override:')).length,0),
+  acceptedDrafts:apps.reduce((n,a)=>n+(a.drafts||[]).filter((d:any)=>d.state==='accepted').length,0)
+ };
+ const items:any[]=[];
+ function add(caseFile:any,item:any,kind:string,severity:number,title:string,owner:string|null,due:string|null){
+  items.push({appId:caseFile.id,reference:caseFile.reference,business:caseFile.business,sourceId:item.id,kind,severity,title,owner,due});
+ }
+ for(const {caseFile,deficiency:d} of unresolved){
+  if(d.verification==='received')add(caseFile,d,'deficiency',0,'Verify received evidence: '+d.description,caseFile.owner||null,d.due||null);
+  else if(d.due&&d.due<today)add(caseFile,d,'deficiency',1,'Overdue evidence: '+d.description,caseFile.owner||null,d.due);
+ }
+ for(const {caseFile,task:t} of openTasks){
+  if(t.state==='blocked')add(caseFile,t,'task',2,'Unblock: '+t.title,t.owner||null,t.due||null);
+  else if(!t.owner)add(caseFile,t,'task',3,'Assign: '+t.title,null,t.due||null);
+  else if(t.due&&t.due<today)add(caseFile,t,'task',4,'Overdue task: '+t.title,t.owner||null,t.due);
+ }
+ items.sort((a,b)=>a.severity-b.severity||(a.due||'9999-12-31').localeCompare(b.due||'9999-12-31')||String(a.reference).localeCompare(String(b.reference))||String(a.sourceId).localeCompare(String(b.sourceId)));
+ return {asOf:today,counts,priorityItems:items.slice(0,20),priorityTotal:items.length,recentEvents};
+}
