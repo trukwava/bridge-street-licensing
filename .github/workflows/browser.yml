@@ -17,6 +17,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Generate ephemeral test identities
+        shell: bash
+        run: |
+          echo "BSL_TEST_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "BSL_TEST_COORD_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
       - name: Install pinned browser test runner
         run: npm install --no-save --no-audit --no-fund @playwright/test@1.56.1
       - name: Install Chromium and operating-system libraries
@@ -25,6 +30,8 @@ jobs:
         shell: bash
         run: |
           echo "DB_PATH=$RUNNER_TEMP/bridge-street-browser.sqlite" >> "$GITHUB_ENV"
+          printf '%s' "$BSL_TEST_PASSWORD" | DB_PATH="$RUNNER_TEMP/bridge-street-browser.sqlite" node user-admin.ts create Taylor supervisor
+          printf '%s' "$BSL_TEST_COORD_PASSWORD" | DB_PATH="$RUNNER_TEMP/bridge-street-browser.sqlite" node user-admin.ts create Morgan coordinator
           DB_PATH="$RUNNER_TEMP/bridge-street-browser.sqlite" node server.ts > "$RUNNER_TEMP/bridge-street-browser.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/bridge-street-browser.pid"
           ready=0
