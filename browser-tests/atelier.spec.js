@@ -10,10 +10,15 @@ let testCsrf='';
 function authenticatedPost(request,url,options){
  return request.post(url,{...options,headers:{...(options?.headers||{}),'X-CSRF-Token':testCsrf}});
 }
-test.beforeEach(async ({request}) => {
+test.beforeEach(async ({request,page}) => {
  const login=await request.post('/api/auth/login',{data:{username:'Taylor',password:process.env.BSL_TEST_PASSWORD}});
  expect(login.status()).toBe(200);
  testCsrf=(await login.json()).csrfToken;
+ // The standalone API request fixture does not share cookies with Chromium.
+ // Transfer this isolated test-session cookie into the browser context.
+ const token=/bsl_session=([0-9a-f]{64})/.exec(login.headers()['set-cookie']||'')?.[1];
+ expect(token).toBeTruthy();
+ await page.context().addCookies([{name:'bsl_session',value:token,url:'http://127.0.0.1:4173',httpOnly:true,sameSite:'Strict'}]);
  const reset=await authenticatedPost(request,'/api/reset',{data:{}});
  expect(reset.status()).toBe(200);
 });
