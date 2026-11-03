@@ -180,6 +180,7 @@ test('skip link and active navigation are keyboard discoverable',async ({page})=
 
 test('case finder uses actual application identity and keyboard shortcut',async ({page})=>{
  await page.goto('/');
+ await expect(page.locator('.command')).toBeVisible(); // wait for authenticated app bootstrap
  await page.keyboard.press('Control+k');
  await expect(page.locator('#caseFinder')).toBeVisible();
  await page.locator('#finderSearch').fill('SBP-2026-015');
