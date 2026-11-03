@@ -16,6 +16,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Generate ephemeral test identities
+        shell: bash
+        run: |
+          echo "BSL_TEST_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "BSL_TEST_COORD_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
       - run: npm test
       - name: Verify offline backup and restore safeguards
         run: node backup-test.ts
@@ -23,6 +28,8 @@ jobs:
         shell: bash
         run: |
           export DB_PATH="$RUNNER_TEMP/bridge-street-integration.sqlite"
+          printf '%s' "$BSL_TEST_PASSWORD" | node user-admin.ts create Taylor supervisor
+          printf '%s' "$BSL_TEST_COORD_PASSWORD" | node user-admin.ts create Morgan coordinator
           node server.ts > "$RUNNER_TEMP/bridge-street-server.log" 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
