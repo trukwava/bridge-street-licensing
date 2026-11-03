@@ -6,9 +6,34 @@ import {readFile} from 'node:fs/promises';
  * Tests are intentionally sequential: reset is a destructive demo operation.
  */
 test.describe.configure({mode:'serial'});
+let testCsrf='';
+function authenticatedPost(request,url,options){
+ return request.post(url,{...options,headers:{...(options?.headers||{}),'X-CSRF-Token':testCsrf}});
+}
 test.beforeEach(async ({request}) => {
- const reset=await request.post('/api/reset',{data:{}});
+ const login=await request.post('/api/auth/login',{data:{username:'Taylor',password:process.env.BSL_TEST_PASSWORD}});
+ expect(login.status()).toBe(200);
+ testCsrf=(await login.json()).csrfToken;
+ const reset=await authenticatedPost(request,'/api/reset',{data:{}});
  expect(reset.status()).toBe(200);
+});
+
+test('unauthenticated browser cannot open cases and can sign in securely',async ({page})=>{
+ await page.context().clearCookies();
+ await page.goto('/');
+ await expect(page.locator('#authGate')).toBeVisible();
+ await expect(page.locator('.command')).toHaveCount(0);
+ const blocked=await page.request.get('/api');
+ expect(blocked.status()).toBe(401);
+ await page.locator('#authUsername').fill('Taylor');
+ await page.locator('#authPassword').fill(process.env.BSL_TEST_PASSWORD);
+ await page.locator('#authSubmit').click();
+ await expect(page.locator('#authGate')).not.toBeVisible();
+ await expect(page.locator('.command')).toBeVisible();
+ await expect(page.locator('#signedInAs')).toContainText('Taylor');
+ await page.locator('#logout').click();
+ await expect(page.locator('#authGate')).toBeVisible();
+ expect((await page.request.get('/api')).status()).toBe(401);
 });
 
 test('daily operations dashboard is readable, data-backed and styled',async ({page})=>{
@@ -72,7 +97,7 @@ test('portfolio displays 14 active cases and opens the selected case',async ({pa
 });
 
 test('portfolio CSV excludes withdrawn work and neutralizes spreadsheet formulas',async ({page,request})=>{
- const app=await request.post('/api/create',{data:{client:'Synthetic pilot',business:'=SUM(1,1)',reference:'CSV-TEST-001',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'}});
+ const app=await authenticatedPost(request,'/api/create',{data:{client:'Synthetic pilot',business:'=SUM(1,1)',reference:'CSV-TEST-001',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'}});
  expect(app.status()).toBe(200);
  await page.goto('/');
  await page.locator('nav button[data-view="portfolio"]').click();
@@ -194,7 +219,7 @@ test('stale edits never overwrite newer work and offer an explicit recovery path
  await page.locator('#f-note').fill('Unsaved handoff note to preserve');
  const snapshot=await (await request.get('/api')).json();
  const app=snapshot.apps.find(a=>a.id==='BS-005');
- const updated=await request.post('/api/reference',{data:{id:app.id,revision:app.revision,kind:'documents',label:'Concurrent addition',reference:'SYN-NEW'}});
+ const updated=await authenticatedPost(request,'/api/reference',{data:{id:app.id,revision:app.revision,kind:'documents',label:'Concurrent addition',reference:'SYN-NEW'}});
  expect(updated.status()).toBe(200);
  await page.locator('#modalSave').click();
  await expect(page.locator('#dialog')).toBeVisible();
@@ -237,11 +262,11 @@ test('workflow version editor creates a new template without rewriting old case 
  const state=await (await request.get('/api')).json();
  const old=state.apps.find(a=>a.id==='BS-001');
  expect(old.templateVersion).toBe(1);
- const resp=await request.post('/api/create',{data:{client:'Pilot client',business:'Template test case',reference:'PILOT-TEMPLATE-002',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'}});
+ const resp=await authenticatedPost(request,'/api/create',{data:{client:'Pilot client',business:'Template test case',reference:'PILOT-TEMPLATE-002',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'}});
  expect(resp.status()).toBe(200);
  const created=await resp.json();
  expect(created.templateVersion).toBe(2);
- const drafted=await request.post('/api/draft',{data:{id:created.id,revision:created.revision}});
+ const drafted=await authenticatedPost(request,'/api/draft',{data:{id:created.id,revision:created.revision}});
  expect(drafted.status()).toBe(200);
  expect((await drafted.json()).drafts[0].body).toContain('Approved synthetic onboarding message:');
 });
@@ -264,7 +289,7 @@ test('archived cases are read-only until deliberately reactivated',async ({page}
 
 test('untrusted case names are rendered inert and never execute HTML',async ({page,request})=>{
  const malicious='<img src=x onerror="window.__untrustedExecuted=true">';
- const resp=await request.post('/api/create',{data:{
+ const resp=await authenticatedPost(request,'/api/create',{data:{
   client:'Synthetic adversarial fixture',business:malicious,reference:'SAFETY-HTML-001',
   jurisdiction:'Fictional',owner:'Alex',priority:'Normal'
  }});
