@@ -143,3 +143,29 @@ The **Export shift brief** action downloads a local Markdown handoff with the as
 The local HTTP server checks that its request Host is `localhost` or `127.0.0.1` and refuses foreign hostnames. It adds Content Security Policy, no-sniff, same-origin resource, no-referrer, frame-denial and no-store response headers. These controls reduce accidental exposure of the unauthenticated synthetic demo but **are not user authentication, production authorization, or tenant isolation**. The server still binds to the IPv4 loopback interface only.
 
 GitHub Actions exercises the Observatory domain counters, API source IDs, browser navigation into live task/deficiency forms, shift-brief download, and host/security-response headers. The latest commit's CI must be green before considering this iteration verified.
+
+## Local authentication and supervisor permissions
+
+**Authentication is required to access any case data or mutate the demo.** There are no default users or passwords, no self-registration, and no credentials in the repository. The login page appears until the local operator provisions an account. The server binds to `127.0.0.1` and is not a production hosting service.
+
+1. Stop the server, then provision a supervisor **against the same SQLite database you will run**. On Bash or Zsh:
+
+```sh
+read -rs 'BSL_PW?New supervisor password (12+ characters): '
+echo
+printf '%s' "$BSL_PW" | node user-admin.ts create Taylor supervisor
+unset BSL_PW
+npm start
+```
+
+2. Visit `http://127.0.0.1:4173` and sign in as `Taylor` with the password you chose. You can provision an additional coordinator with the same private-prompt pattern and `node user-admin.ts create Morgan coordinator`. Accounts are created offline, never via an HTTP registration endpoint.
+
+3. Manage accounts with `node user-admin.ts list`, `node user-admin.ts password Taylor` (new password provided on stdin), or `node user-admin.ts disable Morgan`. Rotating a password or disabling a user revokes their existing sessions. The final enabled supervisor cannot be disabled. Stop the demo server when administering accounts offline.
+
+The server hashes passwords using salted Node.js `scrypt` (not reversible encryption); maintains random 12-hour HttpOnly, SameSite=Strict sessions in SQLite; and requires a separate CSRF token for every authenticated write. Sessions are invalidated by logout and password rotation. Login attempts are throttled per username in the local process. Authentication-related headers and tokens are never intended for Git history.
+
+**Server-enforced roles:** `supervisor` can reset synthetic records, publish workflow versions, change application status, and advance stages despite unresolved requirements with an audited override reason. `coordinator` can do routine case, evidence, task, and draft work and advance a stage when there are no outstanding requirements. A coordinator cannot grant themself supervisor authority through the browser or an API call. Audit events record the authenticated username and role.
+
+**Testing:** GitHub Actions generates fresh random supervisor and coordinator passwords, provisions them against a disposable SQLite file, and runs unit, API, and Chromium checks. No permanent test credentials are committed. The demo's offline archive tool backs up synthetic case records and workflow templates, *not* user accounts and sessions; keep a separate secure administration and recovery plan.
+
+**Important remaining limitations:** This is local password authentication, **not** OAuth/SSO, MFA, TLS termination, centralized login monitoring, network-exposed production access control, or tenant isolation. The session cookie intentionally lacks the `Secure` attribute because this app only serves HTTP on loopback; do not expose it through a proxy without redesigning the HTTPS/session deployment boundary. Real client data must not be entered.
