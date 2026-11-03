@@ -520,3 +520,37 @@ main:focus{outline:none}
 .obs-export{position:relative;z-index:2;display:inline-flex;align-items:center;margin-top:19px;padding:11px 17px;
  background:#e9cd96;color:#1a3b30;border:1px solid #e9cd96;border-radius:6px;font-size:11px;font-weight:800}
 .obs-export:hover{background:#f4deb1;border-color:#f4deb1;color:#17392c}
+
+
+/* Authentication: private-by-default Atelier entry (zero remote assets). */
+body.auth-locked aside,body.auth-locked main{visibility:hidden;pointer-events:none}
+.auth-gate[hidden]{display:none!important}
+.auth-gate{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:26px;
+ overflow-y:auto;background:radial-gradient(circle at 88% 18%,#446851,#112f27 45%,#071d1a 100%);color:#f6efe1}
+.auth-gate:before{content:"";position:fixed;inset:0;pointer-events:none;
+ background:repeating-linear-gradient(90deg,transparent,transparent 82px,#d7bd8b09 83px),
+ repeating-linear-gradient(0deg,transparent,transparent 82px,#d7bd8b09 83px)}
+.auth-panel{position:relative;isolation:isolate;width:min(100%,510px);padding:39px clamp(26px,4vw,49px) 32px;
+ border:1px solid #b6a17991;border-radius:13px;background:linear-gradient(140deg,#fbf8ef,#f0eadd);
+ box-shadow:0 33px 90px #030e0c86;color:#1b4031}
+.auth-panel:before{content:"";position:absolute;width:330px;height:330px;right:-110px;top:-150px;
+ border:1px solid #c5a97970;border-radius:50%;box-shadow:0 0 0 36px #c5a97919,0 0 0 75px #c5a9790c;pointer-events:none;z-index:-1}
+.auth-monogram{display:grid;place-items:center;width:69px;height:69px;border:1px solid #ae8e62;
+ border-radius:50% 50% 6px 6px;color:#e2c08d;background:#1d4638;font:italic 43px var(--at-serif);
+ box-shadow:0 8px 21px #1d443429;margin-bottom:25px}
+.auth-panel .eyebrow{color:#9a7844;font-size:9px}
+.auth-panel .eyebrow:before{background:#9a7844}
+.auth-panel h1{font:500 clamp(38px,4vw,54px)/1.05 var(--at-serif);letter-spacing:-1.6px;margin:17px 0 13px}
+.auth-panel h1 em{color:#a17d4b;font-weight:400}
+.auth-panel>p{color:#687769;font-size:12px;line-height:1.75;margin-bottom:25px}
+.auth-panel label{display:block;color:#375443;font-weight:750;font-size:11px;margin:14px 0 7px}
+.auth-panel input{display:block;width:100%;padding:13px 14px;height:46px;border:1px solid #bdc9bc;background:#fffdf8;
+ border-radius:6px;font-size:14px}
+.auth-panel form .primary{width:100%;margin:15px 0 4px;padding:14px;min-height:47px}
+.auth-panel #authError:not(:empty){color:#9c482f;background:#f9e7dd;border-left:3px solid #b75b3b;
+ padding:10px 13px;border-radius:3px;margin:12px 0;font-size:12px}
+.auth-panel .auth-setup:not([hidden]){font-size:11px;background:#f5ebd5;color:#795e39;
+ border:1px solid #e4d1a9;border-radius:6px;padding:13px;margin:13px 0}
+.auth-panel>small{display:block;text-align:center;margin-top:18px;color:#7e8b7e;font-size:10px}
+[hidden]{display:none!important}
+@media(max-width:520px){.auth-gate{padding:15px}.auth-panel{padding:29px 23px}.auth-panel h1{font-size:39px}}
