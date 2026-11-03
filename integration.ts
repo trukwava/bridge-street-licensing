@@ -1,9 +1,25 @@
 import assert from 'node:assert/strict';
 import {request as httpRequest} from 'node:http';
-const base='http://127.0.0.1:4173/api';const read=()=>fetch(base).then(r=>r.json());async function write(p:string,b:any,code=200){const r=await fetch(base+'/'+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});assert.equal(r.status,code);return r.json()}
+const base='http://127.0.0.1:4173/api';
+let cookie='',csrf='';
+const read=()=>fetch(base,{headers:{Cookie:cookie}}).then(r=>r.json());
+async function write(p:string,b:any,code=200){
+ const r=await fetch(base+'/'+p,{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie,'X-CSRF-Token':csrf},body:JSON.stringify(b)});
+ assert.equal(r.status,code,p+' expected '+code+' got '+r.status+' '+await r.clone().text());
+ return r.json();
+}
+const locked=await fetch(base);assert.equal(locked.status,401,'Cases must be private until sign-in');
+const refusedWrite=await fetch(base+'/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+assert.equal(refusedWrite.status,401);
+const loginResponse=await fetch(base+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'Taylor',password:process.env.BSL_TEST_PASSWORD})});
+assert.equal(loginResponse.status,200,'Provisioned supervisor can log in');
+cookie=loginResponse.headers.get('set-cookie')!.split(';')[0];
+const loginResult=await loginResponse.json();csrf=loginResult.csrfToken;
+assert.equal(loginResult.user.role,'supervisor');
+assert.match(loginResponse.headers.get('set-cookie')||'',/HttpOnly; SameSite=Strict/);
 await write('reset',{});let d=await read();
 
-const normalHeaders=await fetch(base);
+const normalHeaders=await fetch(base,{headers:{Cookie:cookie}});
 assert.match(normalHeaders.headers.get('content-security-policy')||'',/default-src 'self'/);
 assert.equal(normalHeaders.headers.get('x-frame-options'),'DENY');
 assert.equal(normalHeaders.headers.get('cache-control'),'no-store');
@@ -39,7 +55,7 @@ const html=await fetch('http://127.0.0.1:4173/');assert.equal(html.status,200);
 const markup=await html.text();assert.match(markup,/data-view="portfolio"/);assert.match(markup,/data-view="deficiencies"/);assert.match(markup,/id="caseFinder"/);assert.match(markup,/id="quickFind"/);
 const appJS=await fetch('http://127.0.0.1:4173/app.js');assert.equal(appJS.status,200);
 const appSource=await appJS.text();assert.match(appSource,/function deficienciesScreen/);assert.match(appSource,/function showFinder/);assert.equal(d.apps.length,15);assert.equal(d.apps.flatMap((a:any)=>a.tasks).length,40);assert.equal(d.apps.flatMap((a:any)=>a.deficiencies).length,10);assert.equal(d.today.filter((t:any)=>t.flags.includes('Overdue')).length,3);assert.equal(d.today.filter((t:any)=>t.flags.includes('Unassigned')).length,2);
-const invalidToday=await fetch(base+'?today=2026-02-30');assert.equal(invalidToday.status,400);
+const invalidToday=await fetch(base+'?today=2026-02-30',{headers:{Cookie:cookie}});assert.equal(invalidToday.status,400);
 let dueCase=d.apps.find((a:any)=>a.id==='BS-002'),dueTask=dueCase.tasks[0];
 const originalProvenance=dueTask.provenance;
 let updatedDue=await write('task',{id:dueCase.id,revision:dueCase.revision,taskId:dueTask.id,state:dueTask.state,owner:dueTask.owner,due:dueTask.due});
@@ -83,8 +99,30 @@ const withdrawn=(await read()).apps.find((x:any)=>x.id==='BS-015');
 await write('draft',{id:withdrawn.id,revision:withdrawn.revision},400);
 await write('task',{id:withdrawn.id,revision:withdrawn.revision,taskId:withdrawn.tasks[0].id,state:'completed',owner:withdrawn.tasks[0].owner},400);
 await write('stage',{id:withdrawn.id,revision:withdrawn.revision,reason:'Not authorized when withdrawn'},400);
+const coordLogin=await fetch(base+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'Morgan',password:process.env.BSL_TEST_COORD_PASSWORD})});
+assert.equal(coordLogin.status,200);
+const coordinatorCookie=coordLogin.headers.get('set-cookie')!.split(';')[0];
+const coordinatorCsrf=(await coordLogin.json()).csrfToken;
+const coordinatorPost=async(p:string,payload:any)=>{
+ const response=await fetch(base+'/'+p,{method:'POST',headers:{'Content-Type':'application/json','Cookie':coordinatorCookie,'X-CSRF-Token':coordinatorCsrf},body:JSON.stringify(payload)});
+ return response.status;
+};
+assert.equal(await coordinatorPost('reset',{}),403,'Coordinator cannot wipe demo');
+assert.equal(await coordinatorPost('template',{tasks:'Unauthorized'}),403);
+const identityCase=(await read()).apps.find((record:any)=>record.id==='BS-001');
+assert.equal(await coordinatorPost('status',{id:identityCase.id,revision:identityCase.revision,status:'withdrawn'}),403);
+assert.equal(await coordinatorPost('stage',{id:identityCase.id,revision:identityCase.revision,reason:'Unauthorized override'}),403);
+const csrfRejected=await fetch(base+'/reset',{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie,'X-CSRF-Token':'not-a-valid-token'},body:'{}'});
+assert.equal(csrfRejected.status,403);
+const noCsrf=await fetch(base+'/reset',{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie},body:'{}'});
+assert.equal(noCsrf.status,403);
+const me=await fetch(base+'/auth/me',{headers:{Cookie:cookie}});
+assert.equal((await me.json()).user.username,'Taylor');
 await write('reset',{});
 d=await read();
 assert.deepEqual(d.templates.map((t:any)=>t.version),[1],'Reset must restore template library to version 1');
 assert.equal(d.apps.length,15);
-console.log('PASS: seed counts, draft identity, stage blocker/override, persisted handoff, stale-edit conflict, immutable template, record scope, create validation. Atelier assets and portfolio/deficiency models verified. Demo restored.');
+const ended=await fetch(base+'/auth/logout',{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie,'X-CSRF-Token':csrf},body:'{}'});
+assert.equal(ended.status,200);
+assert.equal((await fetch(base,{headers:{Cookie:cookie}})).status,401,'Logout must revoke session');
+console.log('PASS: authentication, CSRF, supervisor/coordinator authorization, seed counts, draft identity, stage blocker/override, persisted handoff, stale-edit conflict, immutable template, record scope, create validation. Atelier assets and portfolio/deficiency models verified. Demo restored.');
