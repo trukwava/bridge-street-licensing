@@ -1,0 +1,42 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {provisionAccount,accountsConfigured,login,resolveSession,assertCsrf,requireRole,logout,disableAccount,changePassword,AuthError} from './auth.ts';
+
+const cookie=(token:string)=>({headers:{cookie:'bsl_session='+token}} as any);
+test('no default accounts, hashed passwords, session and CSRF token',()=>{
+ const db=new DatabaseSync(':memory:');
+ assert.equal(accountsConfigured(db),false);
+ provisionAccount(db,'Taylor','test-strong-password-supervisor','supervisor');
+ assert.equal(accountsConfigured(db),true);
+ const user=db.prepare('SELECT * FROM auth_users WHERE username=?').get('Taylor') as any;
+ assert.equal(user.password_hash.includes('test-strong-password-supervisor'),false);
+ assert.equal(user.salt.length,64);
+ assert.throws(()=>login(db,'Taylor','wrong-password'),e=>e instanceof AuthError&&e.status===401);
+ const result=login(db,'Taylor','test-strong-password-supervisor');
+ const session=resolveSession(db,cookie(result.token))!;
+ assert.equal(session.user.username,'Taylor');
+ assert.equal(session.user.role,'supervisor');
+ assert.equal(session.csrfToken,result.csrfToken);
+ assert.doesNotThrow(()=>assertCsrf(session,result.csrfToken));
+ assert.throws(()=>assertCsrf(session,'bad'),e=>e instanceof AuthError&&e.status===403);
+ logout(db,session);
+ assert.equal(resolveSession(db,cookie(result.token)),null);
+ db.close();
+});
+test('coordinator cannot perform supervisor mutations; password rotation revokes sessions',()=>{
+ const db=new DatabaseSync(':memory:');
+ provisionAccount(db,'Taylor','test-strong-password-supervisor','supervisor');
+ provisionAccount(db,'Morgan','test-strong-password-coordinator','coordinator');
+ const signed=login(db,'Morgan','test-strong-password-coordinator');
+ const session=resolveSession(db,cookie(signed.token))!;
+ assert.throws(()=>requireRole(session),e=>e instanceof AuthError&&e.status===403);
+ changePassword(db,'Morgan','new-strong-password-coordinator');
+ assert.equal(resolveSession(db,cookie(signed.token)),null);
+ assert.throws(()=>login(db,'Morgan','test-strong-password-coordinator'));
+ const active=login(db,'Morgan','new-strong-password-coordinator');
+ disableAccount(db,'Morgan');
+ assert.equal(resolveSession(db,cookie(active.token)),null);
+ assert.throws(()=>disableAccount(db,'Taylor'),/final supervisor/);
+ db.close();
+});
