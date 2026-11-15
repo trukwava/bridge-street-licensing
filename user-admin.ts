@@ -10,7 +10,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
-import {ensureAuthSchema,provisionAccount,disableAccount,changePassword,listAccounts} from './auth.ts';
+import {ensureAuthSchema,provisionAccount,disableAccount,enableAccount,changePassword,listAccounts} from './auth.ts';
 
 const root=fileURLToPath(new URL('.',import.meta.url));
 mkdirSync(resolve(root,'data'),{recursive:true});
@@ -26,10 +26,14 @@ try{
   const password=readFileSync(0,'utf8').replace(/[\r\n]+$/,'');
   if(command==='create')provisionAccount(db,username,password,role as any);
   else changePassword(db,username,password);
-  console.log(command==='create'?'Account provisioned':'Password rotated and sessions revoked');
+  console.log(command==='create'?'Account provisioned':'Password rotated and sessions revoked (enabled state unchanged)');
  }else if(command==='disable'){
   if(!username)throw Error('Username required');
   disableAccount(db,username);
   console.log('Account disabled and sessions revoked');
- }else throw Error('Usage: node user-admin.ts <list|create|password|disable> [username] [supervisor|coordinator]');
+ }else if(command==='enable'){
+  if(!username)throw Error('Username required');
+  enableAccount(db,username);
+  console.log('Account enabled');
+ }else throw Error('Usage: node user-admin.ts <list|create|password|disable|enable> [username] [supervisor|coordinator]');
 }catch(e:any){console.error('Account admin:',e.message);process.exitCode=1;}finally{db.close();}

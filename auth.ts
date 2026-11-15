@@ -11,7 +11,31 @@ export type Role='supervisor'|'coordinator';
 export type Account={username:string;role:Role};
 export type Session={user:Account;csrfToken:string;sessionHash:string};
 const SESSION_MS=12*60*60*1000;
-const attempts=new Map<string,{failures:number;blockedUntil:number}>();
+/**
+ * Per-username failed-login throttle, kept in process memory. Five failures inside the window lock the
+ * username briefly; the count restarts once a lock lapses. Any local caller can still lock a known
+ * username out for lockMs by guessing wrong: inherent to per-username lockout on a loopback demo.
+ */
+export const THROTTLE={maxKeys:1000,maxFailures:5,lockMs:60_000,windowMs:15*60_000};
+const attempts=new Map<string,{failures:number;blockedUntil:number;since:number}>();
+function throttleEntry(key:string,now:number){
+ const e=attempts.get(key);
+ if(e&&e.blockedUntil<=now&&(e.blockedUntil>0||now-e.since>=THROTTLE.windowMs)){attempts.delete(key);return undefined;}
+ return e;
+}
+export function loginLocked(key:string,now:number){return (throttleEntry(key,now)?.blockedUntil||0)>now;}
+/** Bounded table that never forgets an active lock: lapsed entries go first, then unlocked counters (oldest first). */
+export function recordLoginFailure(key:string,now:number){
+ const prior=throttleEntry(key,now);
+ if(!prior&&attempts.size>=THROTTLE.maxKeys){
+  for(const k of [...attempts.keys()])throttleEntry(k,now);
+  for(const [k,e] of attempts){if(attempts.size<THROTTLE.maxKeys)break;if(e.blockedUntil<=now)attempts.delete(k);}
+  if(attempts.size>=THROTTLE.maxKeys)return false; // Every slot is an active lock: refuse the new entry rather than lift one.
+ }
+ const failures=(prior?.failures||0)+1;
+ attempts.set(key,{failures,blockedUntil:failures>=THROTTLE.maxFailures?now+THROTTLE.lockMs:0,since:prior?.since??now});
+ return true;
+}
 const SESSION_COOKIE='bsl_session';
 
 export class AuthError extends Error{
@@ -50,13 +74,18 @@ export function disableAccount(db:DatabaseSync,username:string){
  db.prepare('UPDATE auth_users SET enabled=0 WHERE username=?').run(username);
  db.prepare('DELETE FROM auth_sessions WHERE username=?').run(username);
 }
+export function enableAccount(db:DatabaseSync,username:string){
+ ensureAuthSchema(db);
+ if(!db.prepare('UPDATE auth_users SET enabled=1 WHERE username=?').run(username).changes)throw Error('Account not found');
+}
+/** Rotates the password and revokes sessions; a disabled account stays disabled until enableAccount. */
 export function changePassword(db:DatabaseSync,username:string,password:string){
  ensureAuthSchema(db);
  const existing=db.prepare('SELECT username,role FROM auth_users WHERE username=?').get(username) as {username:string;role:Role}|undefined;
  if(!existing)throw Error('Account not found');
  validateAccount(username,password,existing.role);
  const salt=randomBytes(32).toString('hex');
- db.prepare('UPDATE auth_users SET salt=?,password_hash=?,enabled=1 WHERE username=?').run(salt,derived(password,salt),username);
+ db.prepare('UPDATE auth_users SET salt=?,password_hash=? WHERE username=?').run(salt,derived(password,salt),username);
  db.prepare('DELETE FROM auth_sessions WHERE username=?').run(username);
 }
 export function listAccounts(db:DatabaseSync){
@@ -73,19 +102,13 @@ export function login(db:DatabaseSync,username:string,password:string){
  if(typeof username!=='string'||typeof password!=='string'||username.length>64||Buffer.byteLength(password,'utf8')>256)throw new AuthError(401,'Invalid username or password');
  const key=/^[A-Za-z][A-Za-z0-9._-]{2,31}$/.test(username)?username:'<invalid>';
  const now=Date.now();
- const existing=attempts.get(key);
- if(existing&&existing.blockedUntil>now)throw new AuthError(429,'Too many login attempts. Try again later');
+ if(loginLocked(key,now))throw new AuthError(429,'Too many login attempts. Try again later');
  const user=db.prepare('SELECT username,role,salt,password_hash,enabled FROM auth_users WHERE username=?').get(username) as any;
  // Equal-cost derivation for nonexistent users, avoiding cheap account enumeration.
  const computed=derived(password,user?.salt||'0'.repeat(64));
  const expected=Buffer.from(user?.password_hash||'0'.repeat(128),'hex');
  const valid=timingSafeEqual(Buffer.from(computed,'hex'),expected)&&user?.enabled===1;
- if(!valid){
-  const failures=(existing?.failures||0)+1;
-  if(attempts.size>1000)attempts.clear();
-  attempts.set(key,{failures,blockedUntil:failures>=5?now+60_000:0});
-  throw new AuthError(401,'Invalid username or password');
- }
+ if(!valid){recordLoginFailure(key,now);throw new AuthError(401,'Invalid username or password');}
  attempts.delete(key);
  const token=randomBytes(32).toString('hex');
  const csrfToken=randomBytes(32).toString('hex');
