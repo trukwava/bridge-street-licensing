@@ -1,0 +1,92 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {provisionAccount,accountsConfigured,login,resolveSession,assertCsrf,requireRole,logout,disableAccount,enableAccount,changePassword,listAccounts,loginLocked,recordLoginFailure,THROTTLE,AuthError} from './auth.ts';
+
+const cookie=(token:string)=>({headers:{cookie:'bsl_session='+token}} as any);
+test('no default accounts, hashed passwords, session and CSRF token',()=>{
+ const db=new DatabaseSync(':memory:');
+ assert.equal(accountsConfigured(db),false);
+ provisionAccount(db,'Taylor','test-strong-password-supervisor','supervisor');
+ assert.equal(accountsConfigured(db),true);
+ const user=db.prepare('SELECT * FROM auth_users WHERE username=?').get('Taylor') as any;
+ assert.equal(user.password_hash.includes('test-strong-password-supervisor'),false);
+ assert.equal(user.salt.length,64);
+ assert.throws(()=>login(db,'Taylor','wrong-password'),e=>e instanceof AuthError&&e.status===401);
+ const result=login(db,'Taylor','test-strong-password-supervisor');
+ const session=resolveSession(db,cookie(result.token))!;
+ assert.equal(session.user.username,'Taylor');
+ assert.equal(session.user.role,'supervisor');
+ assert.equal(session.csrfToken,result.csrfToken);
+ assert.doesNotThrow(()=>assertCsrf(session,result.csrfToken));
+ assert.throws(()=>assertCsrf(session,'bad'),e=>e instanceof AuthError&&e.status===403);
+ logout(db,session);
+ assert.equal(resolveSession(db,cookie(result.token)),null);
+ db.close();
+});
+test('coordinator cannot perform supervisor mutations; password rotation revokes sessions',()=>{
+ const db=new DatabaseSync(':memory:');
+ provisionAccount(db,'Taylor','test-strong-password-supervisor','supervisor');
+ provisionAccount(db,'Morgan','test-strong-password-coordinator','coordinator');
+ const signed=login(db,'Morgan','test-strong-password-coordinator');
+ const session=resolveSession(db,cookie(signed.token))!;
+ assert.throws(()=>requireRole(session),e=>e instanceof AuthError&&e.status===403);
+ changePassword(db,'Morgan','new-strong-password-coordinator');
+ assert.equal(resolveSession(db,cookie(signed.token)),null);
+ assert.throws(()=>login(db,'Morgan','test-strong-password-coordinator'));
+ const active=login(db,'Morgan','new-strong-password-coordinator');
+ disableAccount(db,'Morgan');
+ assert.equal(resolveSession(db,cookie(active.token)),null);
+ assert.throws(()=>disableAccount(db,'Taylor'),/final supervisor/);
+ db.close();
+});
+test('password rotation keeps a disabled account disabled until explicitly re-enabled',()=>{
+ const db=new DatabaseSync(':memory:');
+ provisionAccount(db,'Taylor','test-strong-password-supervisor','supervisor');
+ provisionAccount(db,'Alex','test-strong-password-coordinator','coordinator');
+ disableAccount(db,'Alex');
+ changePassword(db,'Alex','rotated-strong-password-coordinator');
+ assert.equal((listAccounts(db) as any[]).find(a=>a.username==='Alex').enabled,0);
+ assert.throws(()=>login(db,'Alex','rotated-strong-password-coordinator'),e=>e instanceof AuthError&&e.status===401);
+ enableAccount(db,'Alex');
+ assert.equal(login(db,'Alex','rotated-strong-password-coordinator').user.username,'Alex');
+ assert.throws(()=>enableAccount(db,'Nobody'),/not found/);
+ db.close();
+});
+test('sessions expire after 12 hours (mocked clock)',t=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.UTC(2026,0,2)});
+ const db=new DatabaseSync(':memory:');
+ provisionAccount(db,'Jamie','test-strong-password-coordinator','coordinator');
+ const signed=login(db,'Jamie','test-strong-password-coordinator');
+ t.mock.timers.tick(12*60*60*1000-1);
+ assert.equal(resolveSession(db,cookie(signed.token))?.user.username,'Jamie');
+ t.mock.timers.tick(1);
+ assert.equal(resolveSession(db,cookie(signed.token)),null,'Session must be rejected at its expiry instant');
+ login(db,'Jamie','test-strong-password-coordinator');
+ assert.equal((db.prepare('SELECT COUNT(*) AS count FROM auth_sessions').get() as any).count,1,'Expired session row is purged at next sign-in');
+ db.close();
+});
+test('a lapsed lockout resets the failure count; one later bad guess does not re-lock (mocked clock)',t=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.UTC(2026,0,3)});
+ const db=new DatabaseSync(':memory:');
+ provisionAccount(db,'Casey','test-strong-password-coordinator','coordinator');
+ for(let i=0;i<THROTTLE.maxFailures;i++)assert.throws(()=>login(db,'Casey','wrong-password-guess'),e=>e instanceof AuthError&&e.status===401);
+ assert.throws(()=>login(db,'Casey','test-strong-password-coordinator'),e=>e instanceof AuthError&&e.status===429);
+ t.mock.timers.tick(THROTTLE.lockMs);
+ assert.throws(()=>login(db,'Casey','wrong-password-guess'),e=>e instanceof AuthError&&e.status===401);
+ assert.equal(login(db,'Casey','test-strong-password-coordinator').user.username,'Casey');
+ db.close();
+});
+test('failed-login throttle never evicts an active lock and refuses new keys when saturated',()=>{
+ const t0=1_000_000; // synthetic instant far in the past, so leftover entries are stale for later real-clock tests
+ for(let i=0;i<THROTTLE.maxFailures;i++)recordLoginFailure('Victim',t0);
+ assert.equal(loginLocked('Victim',t0),true);
+ for(let i=0;i<=THROTTLE.maxKeys;i++)recordLoginFailure('junk'+i,t0+1);
+ assert.equal(loginLocked('Victim',t0+1),true,'Junk usernames must not lift an active lock');
+ for(let i=0;i<THROTTLE.maxKeys-1;i++)for(let j=0;j<THROTTLE.maxFailures;j++)recordLoginFailure('lock'+i,t0+2);
+ assert.equal(recordLoginFailure('overflow',t0+2),false,'A table full of active locks refuses new entries');
+ assert.equal(loginLocked('Victim',t0+2)&&loginLocked('lock0',t0+2)&&loginLocked('lock'+(THROTTLE.maxKeys-2),t0+2),true,'Existing locks survive saturation');
+ const later=t0+THROTTLE.lockMs+2;
+ assert.equal(loginLocked('Victim',later),false);
+ assert.equal(recordLoginFailure('overflow',later),true,'Lapsed locks free their slots');
+});
