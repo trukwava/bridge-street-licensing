@@ -10,11 +10,12 @@ Requires Node.js 24 or later. No packages, API keys, paid services, or network a
 npm start
 ```
 
-Open http://127.0.0.1:4173. Optional environment variables are documented in `.env.example`; Node does not automatically load that file. Use `node --env-file=.env server.ts` if you create one.
+Open http://127.0.0.1:4173. Sign-in is required: provision a named local account first (see [Local authentication and supervisor permissions](#local-authentication-and-supervisor-permissions)). Optional environment variables are documented in `.env.example`; Node does not automatically load that file. Use `node --env-file=.env server.ts` if you create one.
 
 ```sh
 npm test
-# With a disposable demo server running on port 4173:
+# With a disposable demo server on port 4173 whose database has Taylor (supervisor) and Morgan (coordinator)
+# provisioned with the passwords in BSL_TEST_PASSWORD and BSL_TEST_COORD_PASSWORD:
 node integration.ts
 ```
 
@@ -24,7 +25,7 @@ node integration.ts
 
 - Today shows overdue, due within seven days, unassigned, blocked, and awaiting-response tasks from active applications. Dates use America/New_York. Overlapping categories intentionally count the same task.
 - Applications identifies records by unique reference, not business/contact name. Create an application to instantiate the latest immutable workflow version.
-- Open Harbor & Pine Studio, SBP-2026-001. Its intake tasks are completed but proof of business address blocks advancement. An explicit supervisor override records a reason and leaves the deficiency visible.
+- Open Harbor & Pine Studio, SBP-2026-001. Its intake tasks are completed but proof of business address blocks advancement. Only a supervisor can advance a stage; an explicit supervisor override records a reason and leaves the deficiency visible.
 - Update a task to change its state, owner, or date. Owner changes require a handoff note. Blocked tasks must reopen before completion. Dependencies must complete first.
 - Review deficiency responses and record a resolution note before verification.
 - Generate a follow-up, edit its wording, choose a recipient, save, and export text. Nothing sends mail. No client email is invented.
@@ -36,7 +37,7 @@ node integration.ts
 
 Node's native TypeScript stripping and SQLite keep this application dependency-free and maintainable. Server domain rules live in `domain.ts` and `server.ts`; the browser uses small native JavaScript modules. Schema is initialized idempotently on first launch; see `docs/model.md`. The local SQLite database persists across reloads and process restarts and is excluded from source control.
 
-This is a loopback-only, single-organization demo. Taylor is a fixed demo supervisor; there is no real authentication or production authorization. Reads and writes scope to the demo organization and record saves use compare-and-swap revisions. Do not expose this server publicly or enter private client records. Publishing the source does not make the running app a hosted service.
+This is a loopback-only, single-organization demo. Sign-in with a named local account is required for all case data; accounts are provisioned offline and hold a `supervisor` or `coordinator` role (see below). This is not production identity or authorization. Reads and writes scope to the demo organization and record saves use compare-and-swap revisions. Do not expose this server publicly or enter private client records. Publishing the source does not make the running app a hosted service.
 
 All imported-looking references are inert escaped text. There are no connectors, model calls, or credential stores. External adapters are deferred. Files have no automatic expiry: records remain until reset or deletion of the local database; exports remain wherever downloaded. There is no compliance certification or remote backup. Manual database backup must be taken while the server is stopped.
 
@@ -55,7 +56,8 @@ The initial domain and HTTP checks passed; consult the current GitHub Actions ru
 - [x] Deterministic editable follow-ups and exports
 - [x] Reference-only documents, mailings and payments
 - [x] Resettable synthetic scenario
-- [ ] Production authentication, staff roles and tenant isolation
+- [x] Named local accounts, sessions, CSRF and supervisor/coordinator roles (loopback demo only)
+- [ ] Production identity (SSO, MFA), organization administration and tenant isolation
 - [ ] Client-approved configurable stage rules and calendars
 - [ ] Editing stage-specific template wording in the interface
 - [x] Dedicated deficiency queue and keyboard-accessible application search
@@ -86,8 +88,11 @@ A dedicated `Browser acceptance` workflow uses pinned Playwright + Chromium agai
 npm install --no-save --no-audit --no-fund @playwright/test@1.56.1
 npx playwright install chromium
 # IMPORTANT: use a disposable database file, and do not use an existing demo database.
-DB_PATH=/tmp/bridge-street-browser.sqlite npm start
-# In another terminal:
+export DB_PATH=/tmp/bridge-street-browser.sqlite BSL_TEST_PASSWORD=$(openssl rand -hex 24) BSL_TEST_COORD_PASSWORD=$(openssl rand -hex 24)
+printf '%s' "$BSL_TEST_PASSWORD" | node user-admin.ts create Taylor supervisor
+printf '%s' "$BSL_TEST_COORD_PASSWORD" | node user-admin.ts create Morgan coordinator
+npm start
+# In another terminal with the same BSL_TEST_* variables:
 npx playwright test --config playwright.config.mjs
 ```
 
@@ -100,24 +105,24 @@ The browser suite intentionally resets its configured database before each test.
 - The case-file **Next Accountable Action** is sourced from the application's own task/deficiency IDs, with a direct edit/review action; it never signifies statutory eligibility or approval.
 - The **Chain of Custody** ledger presents structured task/application owner transfers, their notes and original UTC instants (displayed in the office's New York timezone). The original previous owner is never discarded.
 - The **Portfolio** exports a CSV of active cases and unresolved work. It excludes withdrawn/completed records and prefixes spreadsheet-dangerous cell values before quoting them; no external spreadsheet integration is connected.
-- **Stage advancement** lists the exact unresolved requirements before an override. The reason is persisted; deficiencies remain visible afterward.
+- **Stage advancement** is supervisor-only. It lists the exact unresolved requirements before an override; the reason is persisted and deficiencies remain visible afterward.
 - **Follow-up drafts** use each application's versioned stage-specific wording and current outstanding items. Staff can edit, choose a recipient, mark draft/accepted/rejected, copy locally or export text. Nothing is sent. Acceptance requires a valid recipient and nonempty draft.
 - **Workflow library** can publish new immutable versions, including up to 30 task titles and stage-specific follow-up wording. An in-flight application retains its original snapshot. Explicit demo reset also restores the initial template version.
 - **Stale saves** show a recoverable 409 conflict, preserve the form fields, offer an explicit copy action and reload the latest server record. The application never retries a conflicting mutation automatically.
 - **Archived records** disable editing until reactivated. The API independently rejects writes to withdrawn/completed cases.
 - **Date-only deadlines** are validated as real calendar dates, with timezone-provenance preserved on state-only edits. Case references are normalized for uniqueness without depending on business/contact names.
-- Task cancellation requires an explicit explanatory note and audit history; it is not silently treated as completion. In the demo, cancelled items are excluded from the active checklist after staff has recorded that decision.
+- Task cancellation requires an explicit explanatory note (placeholder-only notes such as "n/a" or "-" are rejected) and audit history; it is not silently treated as completion. In the demo, cancelled items are excluded from the active checklist after staff has recorded that decision.
 - A **Skip to main content** link and visible keyboard focus facilitate navigation. The active desk view is exposed through `aria-current`.
 
 ### Verification and remaining constraints
 
-GitHub Actions runs a domain/HTTP integration suite and pinned Chromium acceptance on Ubuntu 24.04. The browser suite exercises case finding, evidence review, stage overrides, handoffs after reload, optimistic-concurrency recovery, portfolio CSV, stage-specific templates, inactive-case protection, and responsive layouts. It captures CI screenshots with short retention. Inspect the **latest commit's** GitHub Actions results before claiming the newest changes passed.
+GitHub Actions runs a domain/HTTP integration suite and pinned Chromium acceptance on Ubuntu 24.04. The browser suite exercises sign-in, case finding, evidence review, stage overrides, coordinator stage refusal, handoffs after reload, optimistic-concurrency recovery, portfolio CSV, stage-specific templates, inactive-case protection, and responsive layouts. It captures CI screenshots with short retention. Inspect the **latest commit's** GitHub Actions results before claiming the newest changes passed.
 
-The app remains a **single demo organization with fixed demo actor identity**, no real authentication, no organization administration, no authorized legal workflow, no live emailing or payment processing, and no production security certification. Do not expose it on a public network or enter actual client data. A separate product-security and accessibility assessment is required before any real pilot using identifiable records.
+The app remains a **single demo organization** with named local accounts only (no SSO, MFA or production identity), no organization administration, no authorized legal workflow, no live emailing or payment processing, and no production security certification. Do not expose it on a public network or enter actual client data. A separate product-security and accessibility assessment is required before any real pilot using identifiable records.
 
 ### Adversarial checks
 
-CI injects HTML-like text into a synthetic case name and verifies that the portfolio and application workspace render it as inert text, never as markup. API integration tests reject oversized notes and evidence references, invalid dates, and unreasoned cancellations. These tests strengthen the demonstration but are **not** a substitute for application security testing with real authentication and tenant isolation.
+CI injects HTML-like text into a synthetic case name and verifies that the portfolio and application workspace render it as inert text, never as markup. API integration tests reject oversized notes and evidence references, wrong JSON types in mutation bodies, invalid dates, and unreasoned or placeholder-only cancellations. These tests strengthen the demonstration but are **not** a substitute for application security testing with production authentication and tenant isolation.
 
 ## Offline synthetic backup and recovery
 
@@ -140,7 +145,7 @@ The **Observatory** is a read-only portfolio view of the synthetic application's
 
 The **Export shift brief** action downloads a local Markdown handoff with the as-of date, exact counters, exception source IDs, and recorded activity. Nothing is sent. Both active-queue and whole-history counts label their scope explicitly; withdrawn records do not inflate active task statistics.
 
-The local HTTP server checks that its request Host is `localhost` or `127.0.0.1` and refuses foreign hostnames. It adds Content Security Policy, no-sniff, same-origin resource, no-referrer, frame-denial and no-store response headers. These controls reduce accidental exposure of the unauthenticated synthetic demo but **are not user authentication, production authorization, or tenant isolation**. The server still binds to the IPv4 loopback interface only.
+The local HTTP server checks that its request Host is `localhost` or `127.0.0.1` and refuses foreign hostnames. It adds Content Security Policy, no-sniff, same-origin resource, no-referrer, frame-denial and no-store response headers. These controls complement local sign-in (below) and reduce accidental exposure of the synthetic demo, but **are not production authorization or tenant isolation**. The server still binds to the IPv4 loopback interface only.
 
 GitHub Actions exercises the Observatory domain counters, API source IDs, browser navigation into live task/deficiency forms, shift-brief download, and host/security-response headers. The latest commit's CI must be green before considering this iteration verified.
 
@@ -160,11 +165,13 @@ npm start
 
 2. Visit `http://127.0.0.1:4173` and sign in as `Taylor` with the password you chose. You can provision an additional coordinator with the same private-prompt pattern and `node user-admin.ts create Morgan coordinator`. Accounts are created offline, never via an HTTP registration endpoint.
 
-3. Manage accounts with `node user-admin.ts list`, `node user-admin.ts password Taylor` (new password provided on stdin), or `node user-admin.ts disable Morgan`. Rotating a password or disabling a user revokes their existing sessions. The final enabled supervisor cannot be disabled. Stop the demo server when administering accounts offline.
+3. Manage accounts with `node user-admin.ts list`, `node user-admin.ts password Taylor` (new password provided on stdin), `node user-admin.ts disable Morgan`, or `node user-admin.ts enable Morgan`. Rotating a password or disabling a user revokes their existing sessions. Rotating a password does not re-enable a disabled account; only `enable` does. The final enabled supervisor cannot be disabled. Stop the demo server when administering accounts offline.
 
-The server hashes passwords using salted Node.js `scrypt` (not reversible encryption); maintains random 12-hour HttpOnly, SameSite=Strict sessions in SQLite; and requires a separate CSRF token for every authenticated write. Sessions are invalidated by logout and password rotation. Login attempts are throttled per username in the local process. Authentication-related headers and tokens are never intended for Git history.
+The server hashes passwords using salted Node.js `scrypt` (not reversible encryption); maintains random 12-hour HttpOnly, SameSite=Strict sessions in SQLite; and requires a separate CSRF token for every authenticated write. Sessions are invalidated by logout and password rotation.
 
-**Server-enforced roles:** `supervisor` can reset synthetic records, publish workflow versions, change application status, and advance stages despite unresolved requirements with an audited override reason. `coordinator` can do routine case, evidence, task, and draft work and advance a stage when there are no outstanding requirements. A coordinator cannot grant themself supervisor authority through the browser or an API call. Audit events record the authenticated username and role.
+Login attempts are throttled per username in server memory. Five failures within 15 minutes lock that username for 60 seconds; the count restarts once the lock lapses, and a successful sign-in clears it. The table holds at most 1,000 usernames: lapsed and unlocked entries are evicted first and an active lock is never dropped; if every slot holds an active lock, failures for further usernames are not tracked until a lock lapses. Because the throttle is keyed by username, any local process that can reach the loopback port can lock a known username out for up to 60 seconds by guessing wrong. That is inherent to per-username lockout and accepted for this loopback-only demo; it is not network-grade abuse protection. Restarting the server clears the throttle. Authentication-related headers and tokens are never intended for Git history.
+
+**Server-enforced roles:** only a `supervisor` can advance a case's stage, every time, whether or not requirements are outstanding; with unresolved requirements the supervisor must also record an audited override reason. Supervisors can also reset synthetic records, publish workflow versions, and change application status. A `coordinator` does routine case, evidence, task, and draft work (including cancelling tasks with a meaningful reason and verifying evidence) but cannot advance any stage; the browser disables the control and the API returns 403. A coordinator cannot grant themself supervisor authority through the browser or an API call. Audit events record the authenticated username and role, and an override event carries a structured flag that the Observatory counts, so note text that imitates override wording is never counted.
 
 **Testing:** GitHub Actions generates fresh random supervisor and coordinator passwords, provisions them against a disposable SQLite file, and runs unit, API, and Chromium checks. No permanent test credentials are committed. The demo's offline archive tool backs up synthetic case records and workflow templates, *not* user accounts and sessions; keep a separate secure administration and recovery plan.
 
