@@ -162,7 +162,7 @@ test('deficiency verification updates the queue and the same case next action',a
  await page.locator('#f-verification').selectOption('verified');
  await page.locator('#f-resolution').fill('Verified against the synthetic reference under staff review');
  await page.locator('#modalSave').click();
- await expect(page.locator('.next-action-card')).toContainText('Ready for coordinator review');
+ await expect(page.locator('.next-action-card')).toContainText('Ready for supervisor stage review');
  const snapshot=await (await request.get('/api')).json();
  expect(snapshot.deficiencyInbox.some(d=>d.reference==='SBP-2026-001')).toBe(false);
  expect(snapshot.deficiencyInbox.some(d=>d.reference==='SBP-2026-002')).toBe(true);
@@ -253,6 +253,24 @@ test('supervisor override enumerates real blockers and retains the deficiency',a
  await expect(page.locator('.case-hero [aria-current="step"]')).toContainText('Preparation');
  await expect(page.locator('.alert')).toContainText('Proof of business address');
  await expect(page.locator('.timeline')).toContainText('Supervisor override');
+});
+
+test('coordinator cannot advance a stage from the browser or the API',async ({page})=>{
+ await page.context().clearCookies();
+ await page.goto('/');
+ await page.locator('#authUsername').fill('Morgan');
+ await page.locator('#authPassword').fill(process.env.BSL_TEST_COORD_PASSWORD);
+ await page.locator('#authSubmit').click();
+ await expect(page.locator('#signedInAs')).toContainText('Coordinator');
+ await page.locator('#quickFind').click();
+ await page.locator('#finderSearch').fill('SBP-2026-001');
+ await page.locator('.finder-result').click();
+ await expect(page.locator('#advance')).toBeDisabled();
+ await expect(page.locator('#advance')).toHaveAttribute('title',/Only a supervisor/);
+ const app=(await (await page.request.get('/api')).json()).apps.find(a=>a.id==='BS-001');
+ const csrf=(await (await page.request.get('/api/auth/me')).json()).csrfToken;
+ const refused=await page.request.post('/api/stage',{data:{id:app.id,revision:app.revision,reason:'Coordinator attempt'},headers:{'X-CSRF-Token':csrf}});
+ expect(refused.status()).toBe(403);
 });
 
 test('workflow version editor creates a new template without rewriting old case snapshots',async ({page,request})=>{

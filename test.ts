@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {draft,buckets,transition,validateTask,deficiencyInbox,portfolio,caseNextAction,isDateOnly,observatory} from './domain.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {draft,buckets,transition,validateTask,deficiencyInbox,portfolio,caseNextAction,isDateOnly,isPlaceholderNote,observatory} from './domain.ts';
 test('blocked is not complete; reopen first',()=>{assert.throws(()=>transition('blocked','completed'));transition('blocked','in progress');transition('in progress','completed')});
 test('exactly one known owner or explicit unassigned',()=>{validateTask({title:'A',state:'open',owner:null});assert.throws(()=>validateTask({title:'A',state:'open',owner:['Alex','Morgan']}))});
 test('draft uses only source application unresolved items',()=>{const s=draft({business:'Harbor',reference:'A1',stage:'Intake',contact:'Reed',tasks:[{title:'Intake',state:'completed'}],deficiencies:[{description:'Proof of address',verification:'unverified'}]});assert.match(s,/Proof of address/);assert.doesNotMatch(s,/declaration/)});
@@ -81,7 +81,7 @@ test('observatory counts source records once, excludes archived items, preserves
   deficiencies:[{id:'AD1',description:'Address',verification:'received',due:null},
                 {id:'AD2',description:'Identity',verification:'unverified',due:'2026-10-29'}],
   handoffs:[{from:'Alex',to:'Morgan',note:'transfer'}],drafts:[{state:'accepted'}],
-  activity:[{at:'2026-10-30T10:00:00.000Z',actor:'Taylor',action:'Stage Intake → Preparation • Supervisor override: case reviewed'}]},
+  activity:[{at:'2026-10-30T10:00:00.000Z',actor:'Taylor',action:'Stage Intake → Preparation • Supervisor override: case reviewed',override:true}]},
  {id:'B',reference:'REF-B',business:'Example B',status:'active',owner:'Morgan',tasks:[],deficiencies:[],handoffs:[],drafts:[],activity:[]},
  {id:'C',reference:'REF-C',business:'Archive',status:'withdrawn',owner:'Jamie',
   tasks:[{id:'CT1',title:'Old overdue',state:'blocked',owner:null,due:'2020-01-01'}],
@@ -104,4 +104,14 @@ test('observatory counts source records once, excludes archived items, preserves
  assert.equal(result.priorityItems[0].appId,'A');
  assert.equal(result.recentEvents[0].reference,'REF-C');
  assert.equal(result.priorityTotal,4);
+});
+
+test('override count uses the structured flag, never free-text notes',()=>{
+ const one=(activity:any[])=>observatory([{id:'A',reference:'REF-A',business:'Example A',status:'active',tasks:[],deficiencies:[],activity}],'2026-10-30').counts.recordedOverrides;
+ assert.equal(one([{at:'2026-10-30T10:00:00.000Z',actor:'Morgan (coordinator)',action:'Confirm intake details: Alex → Morgan; open → open. Supervisor override: none'}]),0);
+ assert.equal(one([{at:'2026-10-30T10:00:00.000Z',actor:'Taylor (supervisor)',action:'Stage Intake → Preparation • Supervisor override: reviewed',override:true}]),1);
+});
+test('placeholder-only cancellation reasons are rejected',()=>{
+ for(const value of [undefined,null,'','   ','n/a','N/A','na','-','...','x','ok','none','None.','TBD','tbc','12345','cancelled','no reason','Not applicable'])assert.equal(isPlaceholderNote(value),true,String(value));
+ for(const value of ['Duplicate of intake checklist item','Client withdrew this permit type','不要になった手続き'])assert.equal(isPlaceholderNote(value),false,value);
 });

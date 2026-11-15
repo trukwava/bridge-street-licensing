@@ -3,11 +3,12 @@ import {request as httpRequest} from 'node:http';
 const base='http://127.0.0.1:4173/api';
 let cookie='',csrf='';
 const read=()=>fetch(base,{headers:{Cookie:cookie}}).then(r=>r.json());
-async function write(p:string,b:any,code=200){
- const r=await fetch(base+'/'+p,{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie,'X-CSRF-Token':csrf},body:JSON.stringify(b)});
+async function write(p:string,b:any,code=200,as={cookie,csrf}){
+ const r=await fetch(base+'/'+p,{method:'POST',headers:{'Content-Type':'application/json','Cookie':as.cookie,'X-CSRF-Token':as.csrf},body:JSON.stringify(b)});
  assert.equal(r.status,code,p+' expected '+code+' got '+r.status+' '+await r.clone().text());
  return r.json();
 }
+const stages=['Intake','Preparation','Review','Submitted','Complete'];
 const locked=await fetch(base);assert.equal(locked.status,401,'Cases must be private until sign-in');
 const refusedWrite=await fetch(base+'/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
 assert.equal(refusedWrite.status,401);
@@ -66,9 +67,24 @@ const bounds=d.apps.find((item:any)=>item.id==='BS-001');
 await write('handoff',{id:bounds.id,revision:bounds.revision,owner:'Morgan',note:'x'.repeat(2001)},400);
 await write('deficiency',{id:bounds.id,revision:bounds.revision,description:'Bounded test',evidence:'x'.repeat(1001)},400);
 await write('reference',{id:bounds.id,revision:bounds.revision,kind:'documents',label:'Bounded test',reference:'x'.repeat(1001)},400);
+// Wrong JSON types are rejected with 400 and never stored.
+await write('reference',{id:bounds.id,revision:bounds.revision,kind:'documents',label:'Typed test',reference:'SYN-1',status:{nested:{x:1}}},400);
+await write('reference',{id:bounds.id,revision:bounds.revision,kind:'documents',label:['Typed test'],reference:'SYN-1'},400);
+await write('deficiency',{id:bounds.id,revision:bounds.revision,description:'Typed test',evidence:{x:1}},400);
+await write('verify',{id:bounds.id,revision:bounds.revision,deficiencyId:bounds.deficiencies[0].id,verification:'received',response:{x:1}},400);
+await write('task',{id:bounds.id,revision:bounds.revision,taskId:bounds.tasks[0].id,state:bounds.tasks[0].state,owner:bounds.tasks[0].owner,note:{x:1}},400);
+await write('stage',{id:bounds.id,revision:bounds.revision,reason:{x:1}},400);
+await write('reference',{id:bounds.id,revision:String(bounds.revision),kind:'documents',label:'Typed test',reference:'SYN-1'},400);
+await write('template',{tasks:['Injected task']},400);
+await write('template',{tasks:'Typed task',followupIntros:{Intake:{x:1}}},400);
+for(const raw of ['[]','null','"text"']){const r=await fetch(base+'/reference',{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie,'X-CSRF-Token':csrf},body:raw});assert.equal(r.status,400,'Body '+raw+' must be rejected');}
+const untouched=(await read()).apps.find((x:any)=>x.id==='BS-001');
+assert.equal(untouched.revision,bounds.revision,'Rejected mutations must not be stored');
+assert.equal((await read()).templates.length,1);
 const cancelCase=(await read()).apps.find((item:any)=>item.id==='BS-002');
 const cancelTask=cancelCase.tasks[0];
 await write('task',{id:cancelCase.id,revision:cancelCase.revision,taskId:cancelTask.id,state:'cancelled',owner:cancelTask.owner,due:cancelTask.due},400);
+for(const note of ['n/a','  -  ','none'])await write('task',{id:cancelCase.id,revision:cancelCase.revision,taskId:cancelTask.id,state:'cancelled',owner:cancelTask.owner,due:cancelTask.due,note},400);
 const cancelled=await write('task',{id:cancelCase.id,revision:cancelCase.revision,taskId:cancelTask.id,state:'cancelled',owner:cancelTask.owner,due:cancelTask.due,note:'Demo supervisor: this checklist task is no longer required'});
 assert.equal(cancelled.tasks[0].state,'cancelled');
 assert.match(cancelled.activity[0].action,/no longer required/);
@@ -76,11 +92,15 @@ let a=d.apps.find((a:any)=>a.id==='BS-001');await write('stage',{id:a.id,revisio
 assert.match(a.drafts[0].body,/internal intake checklist/i);
 const draftId=a.drafts[0].id;
 await write('save-draft',{id:a.id,revision:a.revision,draftId,body:'Ready for review',state:'accepted',recipient:''},400);
+await write('save-draft',{id:a.id,revision:a.revision,draftId,body:'Ready for review',state:'accepted',recipient:['synthetic@example.test']},400);
+await write('save-draft',{id:a.id,revision:a.revision,draftId,body:{text:'Ready for review'},state:'draft',recipient:''},400);
 a=await write('save-draft',{id:a.id,revision:a.revision,draftId,body:'Needs another review',state:'rejected',recipient:''});
 assert.equal(a.drafts[0].state,'rejected');
 a=await write('save-draft',{id:a.id,revision:a.revision,draftId,body:'Approved internal follow-up',state:'accepted',recipient:'synthetic@example.test'});
 assert.equal(a.drafts[0].state,'accepted');assert.equal(a.drafts[0].recipient,'synthetic@example.test');
 a=await write('stage',{id:a.id,revision:a.revision,reason:'Demo supervisor: continue preparation while address is collected'});assert.equal(a.stage,'Preparation');assert.equal(a.deficiencies[0].verification,'unverified');assert.match(a.activity[0].action,/override/);
+assert.equal(a.activity[0].override,true,'Real override path sets the structured flag');
+assert.equal((await read()).observatory.counts.recordedOverrides,1);
 a=(await read()).apps.find((a:any)=>a.id==='BS-005');const t=a.tasks.find((t:any)=>t.owner==='Alex');const old=a.revision;a=await write('task',{id:a.id,revision:old,taskId:t.id,state:t.state,owner:'Morgan',due:'2026-10-20',note:'Morgan will review the supporting file'});await write('task',{id:a.id,revision:old,taskId:t.id,state:'completed',owner:'Morgan'},409);d=await read();assert.equal(d.today.find((x:any)=>x.id===t.id).owner,'Morgan');assert.match(a.activity[0].action,/Alex → Morgan/);
 const snapshot=JSON.stringify(a.templateSnapshot);await write('template',{tasks:'New intake task\nReview revised documents',followupIntros:{Intake:'Custom approved intake wording for the synthetic demo:'}});a=(await read()).apps.find((x:any)=>x.id===a.id);assert.equal(JSON.stringify(a.templateSnapshot),snapshot);
 const created=await write('create',{client:'New client',business:'New case after versioning',reference:'NEW-2026-A',jurisdiction:'Fictional',owner:'Alex',priority:'Normal'});
@@ -112,6 +132,23 @@ assert.equal(await coordinatorPost('template',{tasks:'Unauthorized'}),403);
 const identityCase=(await read()).apps.find((record:any)=>record.id==='BS-001');
 assert.equal(await coordinatorPost('status',{id:identityCase.id,revision:identityCase.revision,status:'withdrawn'}),403);
 assert.equal(await coordinatorPost('stage',{id:identityCase.id,revision:identityCase.revision,reason:'Unauthorized override'}),403);
+const coordinator={cookie:coordinatorCookie,csrf:coordinatorCsrf};
+// A coordinator note that imitates override wording is audited but never counted as an override.
+const noteCase=(await read()).apps.find((x:any)=>x.id==='BS-006'),noteTask=noteCase.tasks[0];
+const noted=await write('task',{id:noteCase.id,revision:noteCase.revision,taskId:noteTask.id,state:noteTask.state,owner:noteTask.owner==='Morgan'?'Jamie':'Morgan',due:noteTask.due,note:'Supervisor override: none'},200,coordinator);
+assert.match(noted.activity[0].action,/Supervisor override: none/);assert.equal(noted.activity[0].override,undefined);
+assert.equal((await read()).observatory.counts.recordedOverrides,1,'Free-text note must not raise the override count');
+// Role gap: a coordinator may clear every prerequisite but only a supervisor advances the stage.
+let gap=(await read()).apps.find((x:any)=>x.id==='BS-003');const gapStage=gap.stage;
+await write('task',{id:gap.id,revision:gap.revision,taskId:gap.tasks[0].id,state:'cancelled',owner:gap.tasks[0].owner,due:gap.tasks[0].due,note:'n/a'},400,coordinator);
+for(const t of gap.tasks)gap=await write('task',{id:gap.id,revision:gap.revision,taskId:t.id,state:'cancelled',owner:t.owner,due:t.due,note:'Superseded by the revised synthetic intake checklist'},200,coordinator);
+gap=await write('verify',{id:gap.id,revision:gap.revision,deficiencyId:gap.deficiencies[0].id,response:'Synthetic clarification received',verification:'verified',resolution:'Checked against the synthetic reference'},200,coordinator);
+assert.equal((await read()).nextActions[gap.id].kind,'review');
+assert.equal(await coordinatorPost('stage',{id:gap.id,revision:gap.revision}),403,'Coordinator cannot advance a stage even with nothing outstanding');
+assert.equal((await read()).apps.find((x:any)=>x.id==='BS-003').stage,gapStage);
+gap=await write('stage',{id:gap.id,revision:gap.revision});
+assert.equal(gap.stage,stages[stages.indexOf(gapStage)+1]);assert.equal(gap.activity[0].override,undefined,'Unblocked advance is not an override');
+assert.equal((await read()).observatory.counts.recordedOverrides,1);
 const csrfRejected=await fetch(base+'/reset',{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie,'X-CSRF-Token':'not-a-valid-token'},body:'{}'});
 assert.equal(csrfRejected.status,403);
 const noCsrf=await fetch(base+'/reset',{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie},body:'{}'});
@@ -125,4 +162,4 @@ assert.equal(d.apps.length,15);
 const ended=await fetch(base+'/auth/logout',{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie,'X-CSRF-Token':csrf},body:'{}'});
 assert.equal(ended.status,200);
 assert.equal((await fetch(base,{headers:{Cookie:cookie}})).status,401,'Logout must revoke session');
-console.log('PASS: authentication, CSRF, supervisor/coordinator authorization, seed counts, draft identity, stage blocker/override, persisted handoff, stale-edit conflict, immutable template, record scope, create validation. Atelier assets and portfolio/deficiency models verified. Demo restored.');
+console.log('PASS: authentication, CSRF, supervisor/coordinator authorization, supervisor-only stage advance, mutation body types, placeholder cancellation notes, structured override count, seed counts, draft identity, stage blocker/override, persisted handoff, stale-edit conflict, immutable template, record scope, create validation. Atelier assets and portfolio/deficiency models verified. Demo restored.');

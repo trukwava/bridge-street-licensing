@@ -94,10 +94,16 @@ export function caseNextAction(a: any, today: string) {
   return {kind:'task',sourceId:first.id,title:'Progress task: '+first.title,owner:first.owner||null,
    due:first.due||null,explanation:'An open task remains in the application checklist.'};
  }
- return {kind:'review',sourceId:null,title:'Ready for coordinator review',owner:a.owner||null,due:null,
-  explanation:'No outstanding task or unverified deficiency is recorded. Stage advancement still requires staff review.'};
+ return {kind:'review',sourceId:null,title:'Ready for supervisor stage review',owner:a.owner||null,due:null,
+  explanation:'No outstanding task or unverified deficiency is recorded. Only a supervisor can advance the stage.'};
 }
 
+
+/** True for an empty or placeholder-only reason such as "n/a", "-", "none" or "tbd". */
+export function isPlaceholderNote(value: unknown): boolean {
+ const v=String(value ?? '').toLowerCase().replace(/[^\p{L}\p{N}]/gu,'');
+ return v.length<3 || !/\p{L}/u.test(v) || ['none','nil','null','tbd','tbc','todo','test','cancel','cancelled','canceled','noreason','notapplicable','nothing'].includes(v);
+}
 
 /** True only for a real YYYY-MM-DD calendar date; does not convert dates to instants. */
 export function isDateOnly(value: unknown): boolean {
@@ -130,7 +136,8 @@ export function observatory(apps:any[], today:string){
   receivedUnverified:unresolved.filter(({deficiency})=>deficiency.verification==='received').length,
   coordinatorReview:active.filter(a=>outstanding(a).length===0).length,
   recordedHandoffs:apps.reduce((n,a)=>n+(a.handoffs||[]).length,0),
-  recordedOverrides:apps.reduce((n,a)=>n+(a.activity||[]).filter((e:any)=>typeof e.action==='string'&&e.action.includes('Supervisor override:')).length,0),
+  // Structured flag set only by the server's supervisor override path; free-text notes never count.
+  recordedOverrides:apps.reduce((n,a)=>n+(a.activity||[]).filter((e:any)=>e.override===true).length,0),
   acceptedDrafts:apps.reduce((n,a)=>n+(a.drafts||[]).filter((d:any)=>d.state==='accepted').length,0)
  };
  const items:any[]=[];
