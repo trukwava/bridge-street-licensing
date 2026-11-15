@@ -156,7 +156,8 @@ GitHub Actions exercises the Observatory domain counters, API source IDs, browse
 1. Stop the server, then provision a supervisor **against the same SQLite database you will run**. On Bash or Zsh:
 
 ```sh
-read -rs 'BSL_PW?New supervisor password (12+ characters): '
+printf 'New supervisor password (12+ characters): '
+read -rs BSL_PW
 echo
 printf '%s' "$BSL_PW" | node user-admin.ts create Taylor supervisor
 unset BSL_PW
